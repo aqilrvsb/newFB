@@ -628,7 +628,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
         try {
           // Get user's ad accounts first
           const response = await fetch(`https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name&access_token=${session.credentials.facebookAccessToken}`);
-          const accountsData = await response.json();
+          const accountsData: any = await response.json();
           
           if (accountsData.error) {
             return {
@@ -653,7 +653,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           // Get campaigns from the first ad account
           const adAccountId = accountsData.data[0].id;
           const campaignsResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccountId}/campaigns?fields=id,name,objective,status,created_time&limit=${args.limit || 25}&access_token=${session.credentials.facebookAccessToken}`);
-          const campaignsData = await campaignsResponse.json();
+          const campaignsData: any = await campaignsResponse.json();
 
           if (campaignsData.error) {
             return {
@@ -685,7 +685,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
         try {
           // Get user's ad accounts first
           const response = await fetch(`https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name&access_token=${session.credentials.facebookAccessToken}`);
-          const accountsData = await response.json();
+          const accountsData: any = await response.json();
           
           if (accountsData.error || !accountsData.data || accountsData.data.length === 0) {
             return {
@@ -713,7 +713,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             body: JSON.stringify(campaignData)
           });
 
-          const createResult = await createResponse.json();
+          const createResult: any = await createResponse.json();
 
           if (createResult.error) {
             return {
@@ -746,7 +746,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
       case 'get_campaign_details':
         try {
           const campaignResponse = await fetch(`https://graph.facebook.com/v18.0/${args.campaignId}?fields=id,name,objective,status,created_time,updated_time&access_token=${session.credentials.facebookAccessToken}`);
-          const campaignData = await campaignResponse.json();
+          const campaignData: any = await campaignResponse.json();
 
           if (campaignData.error) {
             return {
