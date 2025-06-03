@@ -33,7 +33,7 @@ export const serverConfig: ServerConfig = {
     windowMs: 15 * 60 * 1000,
     maxRequests: process.env.RATE_LIMIT_MAX ? parseInt(process.env.RATE_LIMIT_MAX, 10) : 100
   },
-  sessionTimeout: process.env.SESSION_TIMEOUT ? parseInt(process.env.SESSION_TIMEOUT, 10) : 3600000,
+  sessionTimeout: process.env.SESSION_TIMEOUT ? parseInt(process.env.SESSION_TIMEOUT, 10) : 0, // 0 = no timeout
   environment: (process.env.NODE_ENV as 'development' | 'production') || 'development'
 };
 
@@ -144,7 +144,8 @@ class UserSessionManager {
       return null;
     }
 
-    if (Date.now() - session.lastActivity > serverConfig.sessionTimeout) {
+    // Only check timeout if sessionTimeout is configured (> 0)
+    if (serverConfig.sessionTimeout > 0 && Date.now() - session.lastActivity > serverConfig.sessionTimeout) {
       this.sessions.delete(userId);
       return null;
     }
@@ -161,6 +162,11 @@ class UserSessionManager {
   }
 
   cleanupExpiredSessions(): void {
+    // Only cleanup if sessionTimeout is configured (> 0)
+    if (serverConfig.sessionTimeout <= 0) {
+      return; // No timeout configured, sessions don't expire
+    }
+    
     const now = Date.now();
     for (const [userId, session] of this.sessions.entries()) {
       if (now - session.lastActivity > serverConfig.sessionTimeout) {
