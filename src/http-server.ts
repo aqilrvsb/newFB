@@ -615,53 +615,166 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
     throw new Error('Invalid session');
   }
 
+  // Initialize Facebook API with user's credentials
+  const FacebookAdsApi = require('facebook-nodejs-business-sdk').FacebookAdsApi;
+  const Campaign = require('facebook-nodejs-business-sdk').Campaign;
+  const AdAccount = require('facebook-nodejs-business-sdk').AdAccount;
+  
+  FacebookAdsApi.init(session.credentials.facebookAccessToken);
+
   try {
     switch (toolName) {
-      case 'create_campaign':
-        return {
-          success: true,
-          tool: 'create_campaign',
-          result: {
-            id: `campaign_${Date.now()}`,
-            name: args.name,
-            objective: args.objective,
-            status: args.status || 'ACTIVE',
-            created_time: new Date().toISOString()
-          },
-          message: 'Campaign created successfully (demo mode)'
-        };
-
       case 'get_campaigns':
-        return {
-          success: true,
-          tool: 'get_campaigns',
-          result: {
-            campaigns: [
-              {
-                id: 'campaign_123',
-                name: 'Demo Campaign 1',
-                objective: 'OUTCOME_LEADS',
-                status: 'ACTIVE',
-                created_time: new Date().toISOString()
-              },
-              {
-                id: 'campaign_456',
-                name: 'Demo Campaign 2',
-                objective: 'OUTCOME_SALES',
-                status: 'PAUSED',
-                created_time: new Date().toISOString()
+        try {
+          // Get user's ad accounts first
+          const response = await fetch(`https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name&access_token=${session.credentials.facebookAccessToken}`);
+          const accountsData = await response.json();
+          
+          if (accountsData.error) {
+            return {
+              success: false,
+              error: `Facebook API Error: ${accountsData.error.message}`,
+              tool: 'get_campaigns'
+            };
+          }
+
+          if (!accountsData.data || accountsData.data.length === 0) {
+            return {
+              success: true,
+              tool: 'get_campaigns',
+              result: {
+                campaigns: [],
+                total: 0,
+                message: 'No ad accounts found for this user'
               }
-            ],
-            total: 2
-          },
-          message: 'Campaigns retrieved successfully (demo mode)'
-        };
+            };
+          }
+
+          // Get campaigns from the first ad account
+          const adAccountId = accountsData.data[0].id;
+          const campaignsResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccountId}/campaigns?fields=id,name,objective,status,created_time&limit=${args.limit || 25}&access_token=${session.credentials.facebookAccessToken}`);
+          const campaignsData = await campaignsResponse.json();
+
+          if (campaignsData.error) {
+            return {
+              success: false,
+              error: `Facebook API Error: ${campaignsData.error.message}`,
+              tool: 'get_campaigns'
+            };
+          }
+
+          return {
+            success: true,
+            tool: 'get_campaigns',
+            result: {
+              campaigns: campaignsData.data || [],
+              total: campaignsData.data ? campaignsData.data.length : 0,
+              account: accountsData.data[0]
+            },
+            message: 'Campaigns retrieved successfully from Facebook API'
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `API Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'get_campaigns'
+          };
+        }
+
+      case 'create_campaign':
+        try {
+          // Get user's ad accounts first
+          const response = await fetch(`https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name&access_token=${session.credentials.facebookAccessToken}`);
+          const accountsData = await response.json();
+          
+          if (accountsData.error || !accountsData.data || accountsData.data.length === 0) {
+            return {
+              success: false,
+              error: 'No ad accounts available',
+              tool: 'create_campaign'
+            };
+          }
+
+          const adAccountId = accountsData.data[0].id;
+          
+          // Create campaign
+          const campaignData = {
+            name: args.name,
+            objective: args.objective || 'OUTCOME_LEADS',
+            status: args.status || 'PAUSED',
+            access_token: session.credentials.facebookAccessToken
+          };
+
+          const createResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccountId}/campaigns`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(campaignData)
+          });
+
+          const createResult = await createResponse.json();
+
+          if (createResult.error) {
+            return {
+              success: false,
+              error: `Facebook API Error: ${createResult.error.message}`,
+              tool: 'create_campaign'
+            };
+          }
+
+          return {
+            success: true,
+            tool: 'create_campaign',
+            result: {
+              id: createResult.id,
+              name: args.name,
+              objective: args.objective || 'OUTCOME_LEADS',
+              status: args.status || 'PAUSED',
+              created_time: new Date().toISOString()
+            },
+            message: 'Campaign created successfully'
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `API Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'create_campaign'
+          };
+        }
+
+      case 'get_campaign_details':
+        try {
+          const campaignResponse = await fetch(`https://graph.facebook.com/v18.0/${args.campaignId}?fields=id,name,objective,status,created_time,updated_time&access_token=${session.credentials.facebookAccessToken}`);
+          const campaignData = await campaignResponse.json();
+
+          if (campaignData.error) {
+            return {
+              success: false,
+              error: `Facebook API Error: ${campaignData.error.message}`,
+              tool: 'get_campaign_details'
+            };
+          }
+
+          return {
+            success: true,
+            tool: 'get_campaign_details',
+            result: campaignData,
+            message: 'Campaign details retrieved successfully'
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `API Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'get_campaign_details'
+          };
+        }
 
       default:
         return {
           success: false,
           error: `Unknown tool: ${toolName}`,
-          availableTools: ['create_campaign', 'get_campaigns']
+          availableTools: ['get_campaigns', 'create_campaign', 'get_campaign_details']
         };
     }
   } catch (error) {
