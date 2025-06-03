@@ -228,6 +228,116 @@ wss.on('connection', async (ws: WebSocket, req) => {
 
     console.log(`WebSocket connected for user: ${userId}`);
 
+    // Create MCP server instance for this user
+    const mcpServer = createMcpServer(userId);
+    
+    // Handle MCP protocol messages
+    ws.on('message', async (data: WebSocket.Data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        console.log(`Received MCP message from user ${userId}:`, message);
+        
+        // Handle MCP initialize
+        if (message.method === 'initialize') {
+          const response = {
+            jsonrpc: '2.0',
+            id: message.id,
+            result: {
+              protocolVersion: '2024-11-05',
+              capabilities: {
+                tools: {},
+                prompts: {},
+                resources: {}
+              },
+              serverInfo: {
+                name: 'facebook-ads-mcp',
+                version: '1.0.0'
+              }
+            }
+          };
+          ws.send(JSON.stringify(response));
+          return;
+        }
+
+        // Handle tools/list
+        if (message.method === 'tools/list') {
+          const response = {
+            jsonrpc: '2.0',
+            id: message.id,
+            result: {
+              tools: [
+                {
+                  name: 'create_campaign',
+                  description: 'Create a new Facebook ad campaign',
+                  inputSchema: {
+                    type: 'object',
+                    properties: {
+                      name: { type: 'string', description: 'Campaign name' },
+                      objective: { type: 'string', description: 'Campaign objective' },
+                      status: { type: 'string', description: 'Campaign status', enum: ['ACTIVE', 'PAUSED'] }
+                    },
+                    required: ['name', 'objective']
+                  }
+                },
+                {
+                  name: 'get_campaigns',
+                  description: 'Get list of existing campaigns',
+                  inputSchema: {
+                    type: 'object',
+                    properties: {
+                      limit: { type: 'number', description: 'Number of campaigns to retrieve', default: 25 }
+                    }
+                  }
+                }
+              ]
+            }
+          };
+          ws.send(JSON.stringify(response));
+          return;
+        }
+
+        // Handle tools/call
+        if (message.method === 'tools/call') {
+          const toolResult = await processMcpToolCall(message.params.name, message.params.arguments || {}, userId);
+          const response = {
+            jsonrpc: '2.0',
+            id: message.id,
+            result: {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(toolResult, null, 2)
+                }
+              ]
+            }
+          };
+          ws.send(JSON.stringify(response));
+          return;
+        }
+
+        // Default response for other methods
+        const response = {
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {}
+        };
+        ws.send(JSON.stringify(response));
+
+      } catch (error) {
+        console.error(`Error processing MCP message from user ${userId}:`, error);
+        const errorResponse = {
+          jsonrpc: '2.0',
+          id: message?.id || null,
+          error: {
+            code: -32603,
+            message: 'Internal error',
+            data: error instanceof Error ? error.message : 'Unknown error'
+          }
+        };
+        ws.send(JSON.stringify(errorResponse));
+      }
+    });
+
     ws.on('close', () => {
       console.log(`WebSocket disconnected for user: ${userId}`);
     });
@@ -248,6 +358,70 @@ async function processMcpRequest(method: string, params: any): Promise<any> {
     params,
     timestamp: new Date().toISOString()
   };
+}
+
+async function processMcpToolCall(toolName: string, args: any, userId: string): Promise<any> {
+  const session = userSessionManager.getSession(userId);
+  if (!session) {
+    throw new Error('Invalid session');
+  }
+
+  try {
+    switch (toolName) {
+      case 'create_campaign':
+        return {
+          success: true,
+          tool: 'create_campaign',
+          result: {
+            id: `campaign_${Date.now()}`,
+            name: args.name,
+            objective: args.objective,
+            status: args.status || 'ACTIVE',
+            created_time: new Date().toISOString()
+          },
+          message: 'Campaign created successfully (demo mode)'
+        };
+
+      case 'get_campaigns':
+        return {
+          success: true,
+          tool: 'get_campaigns',
+          result: {
+            campaigns: [
+              {
+                id: 'campaign_123',
+                name: 'Demo Campaign 1',
+                objective: 'OUTCOME_LEADS',
+                status: 'ACTIVE',
+                created_time: new Date().toISOString()
+              },
+              {
+                id: 'campaign_456',
+                name: 'Demo Campaign 2',
+                objective: 'OUTCOME_SALES',
+                status: 'PAUSED',
+                created_time: new Date().toISOString()
+              }
+            ],
+            total: 2
+          },
+          message: 'Campaigns retrieved successfully (demo mode)'
+        };
+
+      default:
+        return {
+          success: false,
+          error: `Unknown tool: ${toolName}`,
+          availableTools: ['create_campaign', 'get_campaigns']
+        };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: `Tool execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      tool: toolName
+    };
+  }
 }
 
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
