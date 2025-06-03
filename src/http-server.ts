@@ -213,12 +213,48 @@ app.get('/get-user-id', (req, res) => {
         
         function copyConfig() {
             const configText = document.getElementById('configJson').textContent;
-            navigator.clipboard.writeText(configText).then(() => {
-                showCopySuccess(event.target, '✅ Config Copied!');
-            }).catch(err => {
-                console.error('Failed to copy: ', err);
-                alert('Failed to copy to clipboard. Please select and copy manually.');
-            });
+            
+            // Try multiple methods for copying
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(configText).then(() => {
+                    showCopySuccess(event.target, '✅ Config Copied!');
+                }).catch(err => {
+                    fallbackCopy(configText, event.target);
+                });
+            } else {
+                fallbackCopy(configText, event.target);
+            }
+        }
+        
+        function fallbackCopy(text, btn) {
+            // Fallback method using text selection
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showCopySuccess(btn, '✅ Config Copied!');
+                } else {
+                    throw new Error('Copy command failed');
+                }
+            } catch (err) {
+                // Final fallback - select the text for manual copy
+                const configElement = document.getElementById('configJson');
+                const range = document.createRange();
+                range.selectNode(configElement);
+                window.getSelection().removeAllRanges();
+                window.getSelection().addRange(range);
+                alert('Please press Ctrl+C (or Cmd+C on Mac) to copy the selected configuration');
+            } finally {
+                document.body.removeChild(textArea);
+            }
         }
         
         function showCopySuccess(btn, message) {
