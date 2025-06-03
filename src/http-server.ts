@@ -888,6 +888,50 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           };
         }
         
+      case 'update_campaign':
+        try {
+          const campaignId = args.campaignId;
+          const name = args.name;
+          const status = args.status;
+          const dailyBudget = args.dailyBudget;
+          const endTime = args.endTime;
+
+          if (!campaignId) {
+            return {
+              success: false,
+              error: 'Campaign ID is required',
+              tool: 'update_campaign'
+            };
+          }
+
+          const Campaign = require('facebook-nodejs-business-sdk').Campaign;
+          const campaign = new Campaign(campaignId);
+          
+          const params: any = {};
+          if (name) params.name = name;
+          if (status) params.status = status;
+          if (dailyBudget) params.daily_budget = dailyBudget * 100; // Convert to cents
+          if (endTime) params.end_time = endTime;
+          
+          await campaign.update(params);
+          
+          return {
+            success: true,
+            tool: 'update_campaign',
+            result: {
+              campaignId: campaignId,
+              updatedFields: params,
+              message: `Campaign ${campaignId} updated successfully`
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error updating campaign: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'update_campaign'
+          };
+        }
+
       case 'select_ad_account':
         try {
           const accountId = args.accountId;
