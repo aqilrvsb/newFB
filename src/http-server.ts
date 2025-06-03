@@ -96,19 +96,15 @@ app.post('/auth', async (req, res) => {
       });
     }
 
-    // Get available ad accounts
-    const accountsResult = await userSessionManager.getAvailableAccounts(userId);
-    
     res.json({
       success: true,
       userId,
-      message: 'Authentication successful',
+      message: 'Authentication successful - Ready to use',
       endpoints: {
         websocket: `/ws/${userId}`,
         http: `/mcp/${userId}`
       },
-      availableAccounts: accountsResult.accounts || [],
-      nextStep: 'Select an ad account using POST /select-account/{userId}'
+      ready: true
     });
   } catch (error) {
     console.error('Auth error:', error);

@@ -35,8 +35,7 @@ Content-Type: application/json
 {
   "facebookAppId": "your_app_id",
   "facebookAppSecret": "your_app_secret", 
-  "facebookAccessToken": "your_access_token",
-  "facebookAccountId": "your_account_id"
+  "facebookAccessToken": "your_access_token"
 }
 
 Response:
@@ -46,7 +45,8 @@ Response:
   "endpoints": {
     "websocket": "/ws/uuid-here",
     "http": "/mcp/uuid-here"
-  }
+  },
+  "ready": true
 }
 ```
 
