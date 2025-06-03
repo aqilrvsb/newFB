@@ -9,6 +9,7 @@ import { RateLimiterMemory } from 'rate-limiter-flexible';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { serverConfig, userSessionManager, UserCredentials } from './config.js';
 import { createMcpServer } from './mcp-server.js';
+import path from 'path';
 
 const rateLimiter = new RateLimiterMemory({
   points: serverConfig.rateLimit.maxRequests,
@@ -31,6 +32,9 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Serve static files from public directory
+app.use('/public', express.static(path.join(process.cwd(), 'public')));
 
 const rateLimitMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
   try {
@@ -444,6 +448,8 @@ app.get('/', (req, res) => {
         body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
         .status { background: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; }
         .endpoint { background: #f8f9fa; padding: 10px; border-radius: 5px; font-family: monospace; }
+        .btn { background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 5px; }
+        .btn:hover { background: #0056b3; }
     </style>
 </head>
 <body>
@@ -453,25 +459,22 @@ app.get('/', (req, res) => {
         <p>Your dynamic Facebook MCP server is operational and ready to accept connections.</p>
     </div>
     
+    <h3>👥 For Users (200 users supported):</h3>
+    <a href="/public/auth.html" class="btn">🔑 Get Your User ID</a>
+    <p>Click above to authenticate and get your personal User ID for Claude Desktop.</p>
+    
     <h3>📡 Available Endpoints:</h3>
     <div class="endpoint">
         <strong>Health Check:</strong> GET /health<br>
         <strong>Authentication:</strong> POST /auth<br>
-        <strong>WebSocket MCP:</strong> ws://domain/ws/{userId}<br>
+        <strong>User ID Generator:</strong> <a href="/public/auth.html">/public/auth.html</a><br>
         <strong>HTTP MCP:</strong> POST /mcp/{userId}
     </div>
-    
-    <h3>👥 For Users (200 users supported):</h3>
-    <ol>
-        <li>Send POST request to <code>/auth</code> with Facebook credentials</li>
-        <li>Get your unique <code>userId</code> in response</li>
-        <li>Configure Claude Desktop or N8N with your personal endpoint</li>
-    </ol>
     
     <h3>🔗 Test Endpoints:</h3>
     <p><a href="/health" target="_blank">Check Server Health</a></p>
     
-    <p><strong>Next:</strong> Users should authenticate with their Facebook credentials to get their personal connection endpoints.</p>
+    <p><strong>All 200 users can get their User ID at:</strong> <a href="/public/auth.html">https://newfb-production.up.railway.app/public/auth.html</a></p>
 </body>
 </html>
   `);
