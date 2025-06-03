@@ -34,7 +34,12 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Serve static files from public directory
-app.use('/public', express.static(path.join(process.cwd(), 'public')));
+app.use('/public', express.static('public'));
+
+// Also serve auth.html directly at /get-user-id route for easier access
+app.get('/get-user-id', (req, res) => {
+  res.sendFile(path.join(process.cwd(), 'public', 'auth.html'));
+});
 
 const rateLimitMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
   try {
@@ -460,21 +465,21 @@ app.get('/', (req, res) => {
     </div>
     
     <h3>👥 For Users (200 users supported):</h3>
-    <a href="/public/auth.html" class="btn">🔑 Get Your User ID</a>
+    <a href="/get-user-id" class="btn">🔑 Get Your User ID</a>
     <p>Click above to authenticate and get your personal User ID for Claude Desktop.</p>
     
     <h3>📡 Available Endpoints:</h3>
     <div class="endpoint">
         <strong>Health Check:</strong> GET /health<br>
         <strong>Authentication:</strong> POST /auth<br>
-        <strong>User ID Generator:</strong> <a href="/public/auth.html">/public/auth.html</a><br>
+        <strong>User ID Generator:</strong> <a href="/get-user-id">/get-user-id</a><br>
         <strong>HTTP MCP:</strong> POST /mcp/{userId}
     </div>
     
     <h3>🔗 Test Endpoints:</h3>
     <p><a href="/health" target="_blank">Check Server Health</a></p>
     
-    <p><strong>All 200 users can get their User ID at:</strong> <a href="/public/auth.html">https://newfb-production.up.railway.app/public/auth.html</a></p>
+    <p><strong>All 200 users can get their User ID at:</strong> <a href="/get-user-id">https://newfb-production.up.railway.app/get-user-id</a></p>
 </body>
 </html>
   `);
