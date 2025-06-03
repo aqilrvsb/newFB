@@ -7,7 +7,7 @@ import WebSocket from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { serverConfig, userSessionManager, UserCredentials } from './config.js';
+import { serverConfig, userSessionManager, UserCredentials, getAdAccountForUser } from './config.js';
 import { createMcpServer } from './mcp-server.js';
 import path from 'path';
 
@@ -932,6 +932,125 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           };
         }
 
+      case 'delete_campaign':
+        try {
+          const campaignId = args.campaignId;
+          if (!campaignId) {
+            return {
+              success: false,
+              error: 'Campaign ID is required',
+              tool: 'delete_campaign'
+            };
+          }
+
+          const Campaign = require('facebook-nodejs-business-sdk').Campaign;
+          const campaign = new Campaign(campaignId);
+          
+          await campaign.delete([]);
+          
+          return {
+            success: true,
+            tool: 'delete_campaign',
+            result: {
+              campaignId: campaignId,
+              message: `Campaign ${campaignId} deleted successfully`
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error deleting campaign: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'delete_campaign'
+          };
+        }
+
+      case 'get_campaign_insights':
+        try {
+          const campaignId = args.campaignId;
+          const dateRange = args.dateRange || 'last_7_days';
+          
+          if (!campaignId) {
+            return {
+              success: false,
+              error: 'Campaign ID is required',
+              tool: 'get_campaign_insights'
+            };
+          }
+
+          // Helper function to get date range
+          const getDateForRange = (range: string) => {
+            const today = new Date();
+            const formatDate = (date: Date) => date.toISOString().split('T')[0];
+            
+            switch (range) {
+              case 'today':
+                return { since: formatDate(today), until: formatDate(today) };
+              case 'yesterday':
+                const yesterday = new Date(today);
+                yesterday.setDate(today.getDate() - 1);
+                return { since: formatDate(yesterday), until: formatDate(yesterday) };
+              case 'last_7_days':
+                const sevenDaysAgo = new Date(today);
+                sevenDaysAgo.setDate(today.getDate() - 7);
+                return { since: formatDate(sevenDaysAgo), until: formatDate(today) };
+              case 'last_30_days':
+                const thirtyDaysAgo = new Date(today);
+                thirtyDaysAgo.setDate(today.getDate() - 30);
+                return { since: formatDate(thirtyDaysAgo), until: formatDate(today) };
+              default:
+                const defaultRange = new Date(today);
+                defaultRange.setDate(today.getDate() - 7);
+                return { since: formatDate(defaultRange), until: formatDate(today) };
+            }
+          };
+
+          const Campaign = require('facebook-nodejs-business-sdk').Campaign;
+          const campaign = new Campaign(campaignId);
+          
+          const fields = [
+            'spend',
+            'impressions', 
+            'clicks',
+            'ctr',
+            'cpm',
+            'cpc',
+            'reach',
+            'frequency'
+          ];
+          
+          const params = {
+            time_range: getDateForRange(dateRange),
+            level: 'campaign'
+          };
+          
+          const insights = await campaign.getInsights(fields, params);
+          
+          return {
+            success: true,
+            tool: 'get_campaign_insights',
+            result: {
+              campaignId: campaignId,
+              dateRange: dateRange,
+              insights: insights.map((insight: any) => ({
+                spend: insight._data?.spend,
+                impressions: insight._data?.impressions,
+                clicks: insight._data?.clicks,
+                ctr: insight._data?.ctr,
+                cpm: insight._data?.cpm,
+                cpc: insight._data?.cpc,
+                reach: insight._data?.reach,
+                frequency: insight._data?.frequency
+              }))
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error getting campaign insights: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'get_campaign_insights'
+          };
+        }
+
       case 'select_ad_account':
         try {
           const accountId = args.accountId;
@@ -966,6 +1085,114 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             success: false,
             error: `Error selecting account: ${error instanceof Error ? error.message : 'Unknown error'}`,
             tool: 'select_ad_account'
+          };
+        }
+
+      case 'create_ad_set':
+        try {
+          const adAccount = getAdAccountForUser(userId);
+          if (!adAccount) {
+            return {
+              success: false,
+              error: 'No ad account selected. Use select_ad_account first.',
+              tool: 'create_ad_set'
+            };
+          }
+
+          const campaignId = args.campaignId;
+          const name = args.name;
+          const targeting = args.targeting;
+          const budget = args.budget;
+
+          if (!campaignId || !name || !targeting || !budget) {
+            return {
+              success: false,
+              error: 'campaignId, name, targeting, and budget are required',
+              tool: 'create_ad_set'
+            };
+          }
+
+          const params = {
+            name: name,
+            campaign_id: campaignId,
+            daily_budget: budget * 100, // Convert to cents
+            billing_event: 'IMPRESSIONS',
+            optimization_goal: 'REACH',
+            targeting: targeting,
+            status: 'PAUSED' // Start paused for safety
+          };
+
+          const fieldsToRead = ['id', 'name', 'status', 'daily_budget', 'campaign_id'];
+          const result = await adAccount.createAdSet(fieldsToRead, params);
+
+          return {
+            success: true,
+            tool: 'create_ad_set',
+            result: {
+              adSetId: result.id,
+              name: result._data?.name,
+              status: result._data?.status,
+              dailyBudget: result._data?.daily_budget ? result._data.daily_budget / 100 : null,
+              campaignId: result._data?.campaign_id,
+              message: 'Ad Set created successfully'
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error creating ad set: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'create_ad_set'
+          };
+        }
+
+      case 'create_custom_audience':
+        try {
+          const adAccount = getAdAccountForUser(userId);
+          if (!adAccount) {
+            return {
+              success: false,
+              error: 'No ad account selected. Use select_ad_account first.',
+              tool: 'create_custom_audience'
+            };
+          }
+
+          const name = args.name;
+          const type = args.type;
+          const description = args.description;
+
+          if (!name || !type) {
+            return {
+              success: false,
+              error: 'name and type are required',
+              tool: 'create_custom_audience'
+            };
+          }
+
+          const params: any = {
+            name: name,
+            subtype: type,
+            description: description || `Custom audience: ${name}`
+          };
+
+          const fieldsToRead = ['id', 'name', 'description', 'approximate_count'];
+          const result = await adAccount.createCustomAudience(fieldsToRead, params);
+
+          return {
+            success: true,
+            tool: 'create_custom_audience',
+            result: {
+              audienceId: result.id,
+              name: result._data?.name,
+              description: result._data?.description,
+              approximateCount: result._data?.approximate_count,
+              message: 'Custom audience created successfully'
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error creating custom audience: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'create_custom_audience'
           };
         }
 
