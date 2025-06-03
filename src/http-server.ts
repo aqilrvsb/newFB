@@ -626,8 +626,8 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
     switch (toolName) {
       case 'get_campaigns':
         try {
-          // Get user's ad accounts first
-          const response = await fetch(`https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name&access_token=${session.credentials.facebookAccessToken}`);
+          // Get ALL user's ad accounts
+          const response = await fetch(`https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name,account_status,currency,timezone_name&access_token=${session.credentials.facebookAccessToken}`);
           const accountsData: any = await response.json();
           
           if (accountsData.error) {
@@ -644,34 +644,82 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
               tool: 'get_campaigns',
               result: {
                 campaigns: [],
+                accounts: [],
                 total: 0,
                 message: 'No ad accounts found for this user'
               }
             };
           }
 
-          // Get campaigns from the first ad account
-          const adAccountId = accountsData.data[0].id;
-          const campaignsResponse = await fetch(`https://graph.facebook.com/v18.0/${adAccountId}/campaigns?fields=id,name,objective,status,created_time&limit=${args.limit || 25}&access_token=${session.credentials.facebookAccessToken}`);
-          const campaignsData: any = await campaignsResponse.json();
+          // If specific account requested, use that account
+          const targetAccountId = args.accountId;
+          let accountsToProcess = accountsData.data;
+          
+          if (targetAccountId) {
+            accountsToProcess = accountsData.data.filter((acc: any) => acc.id === targetAccountId);
+            if (accountsToProcess.length === 0) {
+              return {
+                success: false,
+                error: `Account ${targetAccountId} not found or not accessible`,
+                tool: 'get_campaigns'
+              };
+            }
+          }
 
-          if (campaignsData.error) {
-            return {
-              success: false,
-              error: `Facebook API Error: ${campaignsData.error.message}`,
-              tool: 'get_campaigns'
-            };
+          // Get campaigns from all accounts (or specified account)
+          const allCampaigns: any[] = [];
+          const accountSummaries: any[] = [];
+
+          for (const account of accountsToProcess) {
+            try {
+              const campaignsResponse = await fetch(`https://graph.facebook.com/v18.0/${account.id}/campaigns?fields=id,name,objective,status,created_time,account_id&limit=${args.limit || 25}&access_token=${session.credentials.facebookAccessToken}`);
+              const campaignsData: any = await campaignsResponse.json();
+
+              if (campaignsData.data) {
+                // Add account info to each campaign
+                const campaignsWithAccount = campaignsData.data.map((campaign: any) => ({
+                  ...campaign,
+                  account: {
+                    id: account.id,
+                    name: account.name,
+                    status: account.account_status
+                  }
+                }));
+                allCampaigns.push(...campaignsWithAccount);
+              }
+
+              accountSummaries.push({
+                id: account.id,
+                name: account.name,
+                status: account.account_status,
+                currency: account.currency,
+                timezone: account.timezone_name,
+                campaignsCount: campaignsData.data ? campaignsData.data.length : 0
+              });
+            } catch (accountError) {
+              console.error(`Error fetching campaigns for account ${account.id}:`, accountError);
+              accountSummaries.push({
+                id: account.id,
+                name: account.name,
+                status: account.account_status,
+                error: 'Failed to fetch campaigns'
+              });
+            }
           }
 
           return {
             success: true,
             tool: 'get_campaigns',
             result: {
-              campaigns: campaignsData.data || [],
-              total: campaignsData.data ? campaignsData.data.length : 0,
-              account: accountsData.data[0]
+              campaigns: allCampaigns,
+              accounts: accountSummaries,
+              totalAccounts: accountsData.data.length,
+              totalCampaigns: allCampaigns.length,
+              requestedAccount: targetAccountId || 'all'
             },
-            message: 'Campaigns retrieved successfully from Facebook API'
+            message: targetAccountId 
+              ? `Campaigns retrieved from account ${targetAccountId}` 
+              : `Campaigns retrieved from ${accountSummaries.length} accounts`
           };
         } catch (error) {
           return {
@@ -770,7 +818,48 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           };
         }
 
-      default:
+      case 'get_ad_accounts':
+        try {
+          // Get ALL user's ad accounts with detailed info
+          const response = await fetch(`https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name,account_status,currency,timezone_name,amount_spent,balance,created_time,owner&access_token=${session.credentials.facebookAccessToken}`);
+          const accountsData: any = await response.json();
+          
+          if (accountsData.error) {
+            return {
+              success: false,
+              error: `Facebook API Error: ${accountsData.error.message}`,
+              tool: 'get_ad_accounts'
+            };
+          }
+
+          if (!accountsData.data || accountsData.data.length === 0) {
+            return {
+              success: true,
+              tool: 'get_ad_accounts',
+              result: {
+                accounts: [],
+                total: 0
+              },
+              message: 'No ad accounts found for this user'
+            };
+          }
+
+          return {
+            success: true,
+            tool: 'get_ad_accounts',
+            result: {
+              accounts: accountsData.data,
+              total: accountsData.data.length
+            },
+            message: `Found ${accountsData.data.length} ad accounts`
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `API Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'get_ad_accounts'
+          };
+        }
         return {
           success: false,
           error: `Unknown tool: ${toolName}`,
