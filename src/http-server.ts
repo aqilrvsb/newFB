@@ -440,7 +440,7 @@ app.post('/mcp/:userId', async (req, res) => {
       });
     }
 
-    const response = await processMcpRequest(method, params);
+    const response = await processMcpToolCall(method, params || {}, userId);
     res.json(response);
   } catch (error) {
     console.error('MCP request error:', error);
