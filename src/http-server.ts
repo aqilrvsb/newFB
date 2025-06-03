@@ -233,8 +233,9 @@ wss.on('connection', async (ws: WebSocket, req) => {
     
     // Handle MCP protocol messages
     ws.on('message', async (data: WebSocket.Data) => {
+      let message: any = null;
       try {
-        const message = JSON.parse(data.toString());
+        message = JSON.parse(data.toString());
         console.log(`Received MCP message from user ${userId}:`, message);
         
         // Handle MCP initialize
