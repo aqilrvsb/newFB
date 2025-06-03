@@ -191,7 +191,7 @@ app.get('/get-user-id', (req, res) => {
                         "command": "node",
                         "args": [
                             "-e",
-                            "const https = require('https'); const readline = require('readline'); const USER_ID = '" + userId + "'; const BASE_URL = 'newfb-production.up.railway.app'; const rl = readline.createInterface({ input: process.stdin, output: process.stdout }); function sendRequest(method, params = {}) { return new Promise((resolve, reject) => { const postData = JSON.stringify({ method, params }); const options = { hostname: BASE_URL, port: 443, path: \\\`/mcp/\\\${USER_ID}\\\`, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(postData) } }; const req = https.request(options, (res) => { let data = ''; res.on('data', (chunk) => { data += chunk; }); res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(new Error('Invalid JSON response')); } }); }); req.on('error', reject); req.write(postData); req.end(); }); } rl.on('line', async (line) => { try { const message = JSON.parse(line); if (message.method === 'initialize') { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'facebook-ads-http', version: '1.0.0' } } })); } else if (message.method === 'notifications/initialized') { return; } else if (message.method === 'tools/list') { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { tools: [ { name: 'create_campaign', description: 'Creates a new ad campaign', inputSchema: { type: 'object', properties: { name: { type: 'string' }, objective: { type: 'string' }, status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] } }, required: ['name', 'objective'] } }, { name: 'get_ad_accounts', description: 'Get list of available Facebook ad accounts', inputSchema: { type: 'object', properties: {} } }, { name: 'select_ad_account', description: 'Select a specific Facebook ad account to use', inputSchema: { type: 'object', properties: { accountId: { type: 'string', description: 'Facebook Ad Account ID (e.g., act_1234567890)' } }, required: ['accountId'] } }, { name: 'get_campaigns', description: 'Lists existing campaigns', inputSchema: { type: 'object', properties: { limit: { type: 'number', default: 25 } } } }, { name: 'get_campaign_details', description: 'Gets details for a specific campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string', description: 'Campaign ID' } }, required: ['campaignId'] } }, { name: 'update_campaign', description: 'Updates an existing campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, name: { type: 'string' }, status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] } }, required: ['campaignId'] } }, { name: 'delete_campaign', description: 'Deletes a campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' } }, required: ['campaignId'] } }, { name: 'create_custom_audience', description: 'Creates a custom, website, or engagement audience', inputSchema: { type: 'object', properties: { name: { type: 'string' }, type: { type: 'string', enum: ['CUSTOM', 'WEBSITE', 'ENGAGEMENT'] }, description: { type: 'string' } }, required: ['name', 'type'] } }, { name: 'get_audiences', description: 'Lists available custom audiences', inputSchema: { type: 'object', properties: { limit: { type: 'number', default: 25 } } } }, { name: 'create_lookalike_audience', description: 'Creates a lookalike audience', inputSchema: { type: 'object', properties: { name: { type: 'string' }, sourceAudienceId: { type: 'string' }, country: { type: 'string' }, ratio: { type: 'number', minimum: 1, maximum: 10 } }, required: ['name', 'sourceAudienceId', 'country'] } }, { name: 'create_ad_set', description: 'Creates a new ad set', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, name: { type: 'string' }, targeting: { type: 'object' }, budget: { type: 'number' } }, required: ['campaignId', 'name', 'targeting', 'budget'] } }, { name: 'get_campaign_insights', description: 'Retrieves performance insights for a campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, dateRange: { type: 'string', enum: ['today', 'yesterday', 'last_7_days', 'last_30_days'] } }, required: ['campaignId'] } }, { name: 'generate_campaign_prompt', description: 'Generates a prompt for campaign creation using a template', inputSchema: { type: 'object', properties: { objective: { type: 'string' }, industry: { type: 'string' }, target_audience: { type: 'string' } }, required: ['objective'] } } ] } })); } else if (message.method === 'resources/list') { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { resources: [] } })); } else if (message.method === 'prompts/list') { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { prompts: [] } })); } else if (message.method === 'tools/call') { try { const result = await sendRequest(message.params.name, message.params.arguments || {}); console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] } })); } catch (error) { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, error: { code: -32603, message: error.message } })); } } else { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: {} })); } } catch (error) { console.error('Parse error:', error); } }); process.on('SIGINT', () => process.exit(0)); process.on('SIGTERM', () => process.exit(0));"
+                            "const https = require('https'); const readline = require('readline'); const USER_ID = '" + userId + "'; const BASE_URL = 'newfb-production.up.railway.app'; const rl = readline.createInterface({ input: process.stdin, output: process.stdout }); function sendRequest(method, params = {}) { return new Promise((resolve, reject) => { const postData = JSON.stringify({ method, params }); const options = { hostname: BASE_URL, port: 443, path: \\\`/mcp/\\\${USER_ID}\\\`, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(postData) } }; const req = https.request(options, (res) => { let data = ''; res.on('data', (chunk) => { data += chunk; }); res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(new Error('Invalid JSON response')); } }); }); req.on('error', reject); req.write(postData); req.end(); }); } rl.on('line', async (line) => { try { const message = JSON.parse(line); if (message.method === 'initialize') { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'facebook-ads-http', version: '1.0.0' } } })); } else if (message.method === 'notifications/initialized') { return; } else if (message.method === 'tools/list') { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { tools: [ { name: 'create_campaign', description: 'Creates a new ad campaign', inputSchema: { type: 'object', properties: { name: { type: 'string' }, objective: { type: 'string' }, status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] } }, required: ['name', 'objective'] } }, { name: 'get_ad_accounts', description: 'Get list of available Facebook ad accounts', inputSchema: { type: 'object', properties: {} } }, { name: 'select_ad_account', description: 'Select a specific Facebook ad account to use', inputSchema: { type: 'object', properties: { accountId: { type: 'string', description: 'Facebook Ad Account ID (e.g., act_1234567890)' } }, required: ['accountId'] } }, { name: 'get_campaigns', description: 'Lists existing campaigns', inputSchema: { type: 'object', properties: { limit: { type: 'number', default: 25 } } } }, { name: 'get_campaign_details', description: 'Gets details for a specific campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string', description: 'Campaign ID' } }, required: ['campaignId'] } }, { name: 'update_campaign', description: 'Updates an existing campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, name: { type: 'string' }, status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] } }, required: ['campaignId'] } }, { name: 'delete_campaign', description: 'Deletes a campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' } }, required: ['campaignId'] } }, { name: 'create_custom_audience', description: 'Creates a custom, website, or engagement audience', inputSchema: { type: 'object', properties: { name: { type: 'string' }, type: { type: 'string', enum: ['CUSTOM', 'WEBSITE', 'ENGAGEMENT'] }, description: { type: 'string' } }, required: ['name', 'type'] } }, { name: 'get_audiences', description: 'Lists available custom audiences', inputSchema: { type: 'object', properties: { limit: { type: 'number', default: 25 } } } }, { name: 'create_lookalike_audience', description: 'Creates a lookalike audience', inputSchema: { type: 'object', properties: { name: { type: 'string' }, sourceAudienceId: { type: 'string' }, country: { type: 'string' }, ratio: { type: 'number', minimum: 1, maximum: 10 } }, required: ['name', 'sourceAudienceId', 'country'] } }, { name: 'create_ad_set', description: 'Creates a new ad set', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, name: { type: 'string' }, targeting: { type: 'object' }, budget: { type: 'number' } }, required: ['campaignId', 'name', 'targeting', 'budget'] } }, { name: 'get_campaign_insights', description: 'Retrieves performance insights for a campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, dateRange: { type: 'string', enum: ['today', 'yesterday', 'last_7_days', 'last_30_days'] } }, required: ['campaignId'] } }, { name: 'duplicate_campaign', description: 'Duplicates an existing campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, newName: { type: 'string' } }, required: ['campaignId'] } }, { name: 'update_ad_set', description: 'Updates an existing ad set', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' }, name: { type: 'string' }, status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] }, dailyBudget: { type: 'number' } }, required: ['adSetId'] } }, { name: 'delete_ad_set', description: 'Deletes an ad set', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' } }, required: ['adSetId'] } }, { name: 'duplicate_ad_set', description: 'Duplicates an existing ad set', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' }, newName: { type: 'string' } }, required: ['adSetId'] } }, { name: 'get_ad_set_insights', description: 'Retrieves performance insights for an ad set', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' }, dateRange: { type: 'string', enum: ['today', 'yesterday', 'last_7_days', 'last_30_days'] } }, required: ['adSetId'] } }, { name: 'update_custom_audience', description: 'Updates an existing custom audience', inputSchema: { type: 'object', properties: { audienceId: { type: 'string' }, name: { type: 'string' }, description: { type: 'string' } }, required: ['audienceId'] } }, { name: 'create_ad', description: 'Creates a new ad', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' }, name: { type: 'string' }, creative: { type: 'object' } }, required: ['adSetId', 'name', 'creative'] } }, { name: 'duplicate_ad', description: 'Duplicates an existing ad', inputSchema: { type: 'object', properties: { adId: { type: 'string' }, newName: { type: 'string' } }, required: ['adId'] } }, { name: 'update_ad', description: 'Updates an existing ad', inputSchema: { type: 'object', properties: { adId: { type: 'string' }, name: { type: 'string' }, status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] }, creative: { type: 'object' } }, required: ['adId'] } }, { name: 'delete_ad', description: 'Deletes an ad', inputSchema: { type: 'object', properties: { adId: { type: 'string' } }, required: ['adId'] } }, { name: 'get_ad_insights', description: 'Retrieves performance insights for an ad', inputSchema: { type: 'object', properties: { adId: { type: 'string' }, dateRange: { type: 'string', enum: ['today', 'yesterday', 'last_7_days', 'last_30_days'] } }, required: ['adId'] } }, { name: 'generate_campaign_prompt', description: 'Generates a prompt for campaign creation using a template', inputSchema: { type: 'object', properties: { objective: { type: 'string' }, industry: { type: 'string' }, target_audience: { type: 'string' } }, required: ['objective'] } } ] } })); } else if (message.method === 'resources/list') { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { resources: [] } })); } else if (message.method === 'prompts/list') { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { prompts: [] } })); } else if (message.method === 'tools/call') { try { const result = await sendRequest(message.params.name, message.params.arguments || {}); console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] } })); } catch (error) { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, error: { code: -32603, message: error.message } })); } } else { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: {} })); } } catch (error) { console.error('Parse error:', error); } }); process.on('SIGINT', () => process.exit(0)); process.on('SIGTERM', () => process.exit(0));"
                         ]
                     }
                 }
@@ -1145,6 +1145,331 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           };
         }
 
+      case 'duplicate_campaign':
+        try {
+          const campaignId = args.campaignId;
+          const newName = args.newName;
+          
+          if (!campaignId) {
+            return {
+              success: false,
+              error: 'Campaign ID is required',
+              tool: 'duplicate_campaign'
+            };
+          }
+
+          // Get original campaign details
+          const Campaign = require('facebook-nodejs-business-sdk').Campaign;
+          const originalCampaign = new Campaign(campaignId);
+          
+          const fields = ['name', 'objective', 'status', 'daily_budget', 'lifetime_budget', 'buying_type', 'special_ad_categories'];
+          const campaignDetails = await originalCampaign.get(fields);
+
+          const adAccount = getAdAccountForUser(userId);
+          if (!adAccount) {
+            return {
+              success: false,
+              error: 'No ad account selected. Use select_ad_account first.',
+              tool: 'duplicate_campaign'
+            };
+          }
+
+          // Create duplicate with modified name
+          const params: any = {
+            name: newName || `${campaignDetails._data?.name} - Copy`,
+            objective: campaignDetails._data?.objective,
+            status: 'PAUSED', // Start paused for safety
+            daily_budget: campaignDetails._data?.daily_budget,
+            lifetime_budget: campaignDetails._data?.lifetime_budget,
+            buying_type: campaignDetails._data?.buying_type,
+            special_ad_categories: campaignDetails._data?.special_ad_categories
+          };
+
+          const fieldsToRead = ['id', 'name', 'objective', 'status', 'created_time', 'daily_budget'];
+          const result = await adAccount.createCampaign(fieldsToRead, params);
+
+          return {
+            success: true,
+            tool: 'duplicate_campaign',
+            result: {
+              originalCampaignId: campaignId,
+              newCampaignId: result.id,
+              newCampaignName: result._data?.name,
+              objective: result._data?.objective,
+              status: result._data?.status,
+              message: 'Campaign duplicated successfully'
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error duplicating campaign: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'duplicate_campaign'
+          };
+        }
+
+      case 'update_ad_set':
+        try {
+          const adSetId = args.adSetId;
+          const name = args.name;
+          const status = args.status;
+          const dailyBudget = args.dailyBudget;
+          const targeting = args.targeting;
+
+          if (!adSetId) {
+            return {
+              success: false,
+              error: 'Ad Set ID is required',
+              tool: 'update_ad_set'
+            };
+          }
+
+          const AdSet = require('facebook-nodejs-business-sdk').AdSet;
+          const adSet = new AdSet(adSetId);
+          
+          const params: any = {};
+          if (name) params.name = name;
+          if (status) params.status = status;
+          if (dailyBudget) params.daily_budget = dailyBudget * 100;
+          if (targeting) params.targeting = targeting;
+          
+          await adSet.update(params);
+          
+          return {
+            success: true,
+            tool: 'update_ad_set',
+            result: {
+              adSetId: adSetId,
+              updatedFields: params,
+              message: `Ad Set ${adSetId} updated successfully`
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error updating ad set: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'update_ad_set'
+          };
+        }
+
+      case 'delete_ad_set':
+        try {
+          const adSetId = args.adSetId;
+          if (!adSetId) {
+            return {
+              success: false,
+              error: 'Ad Set ID is required',
+              tool: 'delete_ad_set'
+            };
+          }
+
+          const AdSet = require('facebook-nodejs-business-sdk').AdSet;
+          const adSet = new AdSet(adSetId);
+          
+          await adSet.delete([]);
+          
+          return {
+            success: true,
+            tool: 'delete_ad_set',
+            result: {
+              adSetId: adSetId,
+              message: `Ad Set ${adSetId} deleted successfully`
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error deleting ad set: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'delete_ad_set'
+          };
+        }
+
+      case 'duplicate_ad_set':
+        try {
+          const adSetId = args.adSetId;
+          const newName = args.newName;
+          
+          if (!adSetId) {
+            return {
+              success: false,
+              error: 'Ad Set ID is required',
+              tool: 'duplicate_ad_set'
+            };
+          }
+
+          const AdSet = require('facebook-nodejs-business-sdk').AdSet;
+          const originalAdSet = new AdSet(adSetId);
+          
+          const fields = ['name', 'campaign_id', 'daily_budget', 'targeting', 'billing_event', 'optimization_goal'];
+          const adSetDetails = await originalAdSet.get(fields);
+
+          const adAccount = getAdAccountForUser(userId);
+          if (!adAccount) {
+            return {
+              success: false,
+              error: 'No ad account selected. Use select_ad_account first.',
+              tool: 'duplicate_ad_set'
+            };
+          }
+
+          const params = {
+            name: newName || `${adSetDetails._data?.name} - Copy`,
+            campaign_id: adSetDetails._data?.campaign_id,
+            daily_budget: adSetDetails._data?.daily_budget,
+            targeting: adSetDetails._data?.targeting,
+            billing_event: adSetDetails._data?.billing_event,
+            optimization_goal: adSetDetails._data?.optimization_goal,
+            status: 'PAUSED'
+          };
+
+          const fieldsToRead = ['id', 'name', 'status', 'daily_budget', 'campaign_id'];
+          const result = await adAccount.createAdSet(fieldsToRead, params);
+
+          return {
+            success: true,
+            tool: 'duplicate_ad_set',
+            result: {
+              originalAdSetId: adSetId,
+              newAdSetId: result.id,
+              newAdSetName: result._data?.name,
+              campaignId: result._data?.campaign_id,
+              message: 'Ad Set duplicated successfully'
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error duplicating ad set: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'duplicate_ad_set'
+          };
+        }
+
+      case 'get_ad_set_insights':
+        try {
+          const adSetId = args.adSetId;
+          const dateRange = args.dateRange || 'last_7_days';
+          
+          if (!adSetId) {
+            return {
+              success: false,
+              error: 'Ad Set ID is required',
+              tool: 'get_ad_set_insights'
+            };
+          }
+
+          const getDateForRange = (range: string) => {
+            const today = new Date();
+            const formatDate = (date: Date) => date.toISOString().split('T')[0];
+            
+            switch (range) {
+              case 'today':
+                return { since: formatDate(today), until: formatDate(today) };
+              case 'yesterday':
+                const yesterday = new Date(today);
+                yesterday.setDate(today.getDate() - 1);
+                return { since: formatDate(yesterday), until: formatDate(yesterday) };
+              case 'last_7_days':
+                const sevenDaysAgo = new Date(today);
+                sevenDaysAgo.setDate(today.getDate() - 7);
+                return { since: formatDate(sevenDaysAgo), until: formatDate(today) };
+              case 'last_30_days':
+                const thirtyDaysAgo = new Date(today);
+                thirtyDaysAgo.setDate(today.getDate() - 30);
+                return { since: formatDate(thirtyDaysAgo), until: formatDate(today) };
+              default:
+                const defaultRange = new Date(today);
+                defaultRange.setDate(today.getDate() - 7);
+                return { since: formatDate(defaultRange), until: formatDate(today) };
+            }
+          };
+
+          const AdSet = require('facebook-nodejs-business-sdk').AdSet;
+          const adSet = new AdSet(adSetId);
+          
+          const fields = [
+            'spend',
+            'impressions', 
+            'clicks',
+            'ctr',
+            'cpm',
+            'cpc',
+            'reach',
+            'frequency'
+          ];
+          
+          const params = {
+            time_range: getDateForRange(dateRange),
+            level: 'adset'
+          };
+          
+          const insights = await adSet.getInsights(fields, params);
+          
+          return {
+            success: true,
+            tool: 'get_ad_set_insights',
+            result: {
+              adSetId: adSetId,
+              dateRange: dateRange,
+              insights: insights.map((insight: any) => ({
+                spend: insight._data?.spend,
+                impressions: insight._data?.impressions,
+                clicks: insight._data?.clicks,
+                ctr: insight._data?.ctr,
+                cpm: insight._data?.cpm,
+                cpc: insight._data?.cpc,
+                reach: insight._data?.reach,
+                frequency: insight._data?.frequency
+              }))
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error getting ad set insights: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'get_ad_set_insights'
+          };
+        }
+
+      case 'update_custom_audience':
+        try {
+          const audienceId = args.audienceId;
+          const name = args.name;
+          const description = args.description;
+
+          if (!audienceId) {
+            return {
+              success: false,
+              error: 'Audience ID is required',
+              tool: 'update_custom_audience'
+            };
+          }
+
+          const CustomAudience = require('facebook-nodejs-business-sdk').CustomAudience;
+          const audience = new CustomAudience(audienceId);
+          
+          const params: any = {};
+          if (name) params.name = name;
+          if (description) params.description = description;
+          
+          await audience.update(params);
+          
+          return {
+            success: true,
+            tool: 'update_custom_audience',
+            result: {
+              audienceId: audienceId,
+              updatedFields: params,
+              message: `Custom audience ${audienceId} updated successfully`
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error updating custom audience: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'update_custom_audience'
+          };
+        }
+
       case 'create_custom_audience':
         try {
           const adAccount = getAdAccountForUser(userId);
@@ -1193,6 +1518,275 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             success: false,
             error: `Error creating custom audience: ${error instanceof Error ? error.message : 'Unknown error'}`,
             tool: 'create_custom_audience'
+          };
+        }
+
+      case 'create_ad':
+        try {
+          const adAccount = getAdAccountForUser(userId);
+          if (!adAccount) {
+            return {
+              success: false,
+              error: 'No ad account selected. Use select_ad_account first.',
+              tool: 'create_ad'
+            };
+          }
+
+          const adSetId = args.adSetId;
+          const name = args.name;
+          const creative = args.creative;
+
+          if (!adSetId || !name || !creative) {
+            return {
+              success: false,
+              error: 'adSetId, name, and creative are required',
+              tool: 'create_ad'
+            };
+          }
+
+          const params = {
+            name: name,
+            adset_id: adSetId,
+            creative: creative,
+            status: 'PAUSED' // Start paused for safety
+          };
+
+          const fieldsToRead = ['id', 'name', 'status', 'adset_id'];
+          const result = await adAccount.createAd(fieldsToRead, params);
+
+          return {
+            success: true,
+            tool: 'create_ad',
+            result: {
+              adId: result.id,
+              name: result._data?.name,
+              status: result._data?.status,
+              adSetId: result._data?.adset_id,
+              message: 'Ad created successfully'
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error creating ad: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'create_ad'
+          };
+        }
+
+      case 'duplicate_ad':
+        try {
+          const adId = args.adId;
+          const newName = args.newName;
+          
+          if (!adId) {
+            return {
+              success: false,
+              error: 'Ad ID is required',
+              tool: 'duplicate_ad'
+            };
+          }
+
+          const Ad = require('facebook-nodejs-business-sdk').Ad;
+          const originalAd = new Ad(adId);
+          
+          const fields = ['name', 'adset_id', 'creative'];
+          const adDetails = await originalAd.get(fields);
+
+          const adAccount = getAdAccountForUser(userId);
+          if (!adAccount) {
+            return {
+              success: false,
+              error: 'No ad account selected. Use select_ad_account first.',
+              tool: 'duplicate_ad'
+            };
+          }
+
+          const params = {
+            name: newName || `${adDetails._data?.name} - Copy`,
+            adset_id: adDetails._data?.adset_id,
+            creative: adDetails._data?.creative,
+            status: 'PAUSED'
+          };
+
+          const fieldsToRead = ['id', 'name', 'status', 'adset_id'];
+          const result = await adAccount.createAd(fieldsToRead, params);
+
+          return {
+            success: true,
+            tool: 'duplicate_ad',
+            result: {
+              originalAdId: adId,
+              newAdId: result.id,
+              newAdName: result._data?.name,
+              adSetId: result._data?.adset_id,
+              message: 'Ad duplicated successfully'
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error duplicating ad: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'duplicate_ad'
+          };
+        }
+
+      case 'update_ad':
+        try {
+          const adId = args.adId;
+          const name = args.name;
+          const status = args.status;
+          const creative = args.creative;
+
+          if (!adId) {
+            return {
+              success: false,
+              error: 'Ad ID is required',
+              tool: 'update_ad'
+            };
+          }
+
+          const Ad = require('facebook-nodejs-business-sdk').Ad;
+          const ad = new Ad(adId);
+          
+          const params: any = {};
+          if (name) params.name = name;
+          if (status) params.status = status;
+          if (creative) params.creative = creative;
+          
+          await ad.update(params);
+          
+          return {
+            success: true,
+            tool: 'update_ad',
+            result: {
+              adId: adId,
+              updatedFields: params,
+              message: `Ad ${adId} updated successfully`
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error updating ad: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'update_ad'
+          };
+        }
+
+      case 'delete_ad':
+        try {
+          const adId = args.adId;
+          if (!adId) {
+            return {
+              success: false,
+              error: 'Ad ID is required',
+              tool: 'delete_ad'
+            };
+          }
+
+          const Ad = require('facebook-nodejs-business-sdk').Ad;
+          const ad = new Ad(adId);
+          
+          await ad.delete([]);
+          
+          return {
+            success: true,
+            tool: 'delete_ad',
+            result: {
+              adId: adId,
+              message: `Ad ${adId} deleted successfully`
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error deleting ad: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'delete_ad'
+          };
+        }
+
+      case 'get_ad_insights':
+        try {
+          const adId = args.adId;
+          const dateRange = args.dateRange || 'last_7_days';
+          
+          if (!adId) {
+            return {
+              success: false,
+              error: 'Ad ID is required',
+              tool: 'get_ad_insights'
+            };
+          }
+
+          const getDateForRange = (range: string) => {
+            const today = new Date();
+            const formatDate = (date: Date) => date.toISOString().split('T')[0];
+            
+            switch (range) {
+              case 'today':
+                return { since: formatDate(today), until: formatDate(today) };
+              case 'yesterday':
+                const yesterday = new Date(today);
+                yesterday.setDate(today.getDate() - 1);
+                return { since: formatDate(yesterday), until: formatDate(yesterday) };
+              case 'last_7_days':
+                const sevenDaysAgo = new Date(today);
+                sevenDaysAgo.setDate(today.getDate() - 7);
+                return { since: formatDate(sevenDaysAgo), until: formatDate(today) };
+              case 'last_30_days':
+                const thirtyDaysAgo = new Date(today);
+                thirtyDaysAgo.setDate(today.getDate() - 30);
+                return { since: formatDate(thirtyDaysAgo), until: formatDate(today) };
+              default:
+                const defaultRange = new Date(today);
+                defaultRange.setDate(today.getDate() - 7);
+                return { since: formatDate(defaultRange), until: formatDate(today) };
+            }
+          };
+
+          const Ad = require('facebook-nodejs-business-sdk').Ad;
+          const ad = new Ad(adId);
+          
+          const fields = [
+            'spend',
+            'impressions', 
+            'clicks',
+            'ctr',
+            'cpm',
+            'cpc',
+            'reach',
+            'frequency'
+          ];
+          
+          const params = {
+            time_range: getDateForRange(dateRange),
+            level: 'ad'
+          };
+          
+          const insights = await ad.getInsights(fields, params);
+          
+          return {
+            success: true,
+            tool: 'get_ad_insights',
+            result: {
+              adId: adId,
+              dateRange: dateRange,
+              insights: insights.map((insight: any) => ({
+                spend: insight._data?.spend,
+                impressions: insight._data?.impressions,
+                clicks: insight._data?.clicks,
+                ctr: insight._data?.ctr,
+                cpm: insight._data?.cpm,
+                cpc: insight._data?.cpc,
+                reach: insight._data?.reach,
+                frequency: insight._data?.frequency
+              }))
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error getting ad insights: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'get_ad_insights'
           };
         }
 
