@@ -105,35 +105,45 @@ export const duplicateAdSet = async (
   try {
     const originalAdSet = new AdSet(adSetId);
     
-    // Get original ad set details to use in copy name
-    const adSetDetails = await originalAdSet.get(['name']);
+    // Get original ad set details for copying
+    const adSetDetails = await originalAdSet.get([
+      'name', 'campaign_id', 'targeting', 'optimization_goal', 'billing_event', 'daily_budget'
+    ]);
+    
     const copyName = newName || `${adSetDetails._data?.name} - Copy`;
     
-    // Use Facebook's copies endpoint with advantage_audience parameter
+    // Prepare the copies endpoint parameters
     const params: any = {
+      name: copyName,
       deep_copy: false,
       status_option: 'PAUSED'
     };
     
-    // Set the name directly if provided
-    if (newName) {
-      params.name = newName;
+    // Add the targeting with advantage_audience flag properly set
+    if (adSetDetails._data?.targeting) {
+      params.targeting = {
+        ...adSetDetails._data.targeting,
+        targeting_automation: {
+          advantage_audience: 0  // Explicitly disable advantage audience
+        }
+      };
     } else {
-      params.rename_options = {
-        rename_suffix: ' - Copy'
+      // If no targeting exists, create minimal targeting with advantage_audience
+      params.targeting = {
+        geo_locations: {
+          countries: ['MY']  // Default to Malaysia
+        },
+        age_min: 18,
+        age_max: 65,
+        targeting_automation: {
+          advantage_audience: 0
+        }
       };
     }
     
-    // Add advantage_audience parameter to satisfy Facebook's requirement
-    params.targeting = {
-      targeting_automation: {
-        advantage_audience: 0  // Set to 0 to disable advantage audience
-      }
-    };
-    
     // Use the Facebook Graph API directly for copies endpoint
     const { FacebookApi } = require('facebook-nodejs-business-sdk');
-    const api = FacebookApi.init(process.env.FACEBOOK_ACCESS_TOKEN || '');
+    const api = FacebookApi.init();
     
     const copyResult = await api.call(
       'POST',
@@ -144,12 +154,16 @@ export const duplicateAdSet = async (
     return {
       success: true,
       adSetId: copyResult.copied_adset_id,
-      message: 'Ad set duplicated successfully using Facebook copies endpoint'
+      originalAdSetId: adSetId,
+      newAdSetName: copyName,
+      message: "Ad Set duplicated successfully using Facebook /copies endpoint"
     };
-  } catch (error) {
+  } catch (error: any) {
     return {
       success: false,
-      message: `Error duplicating ad set: ${error instanceof Error ? error.message : 'Unknown error'}`
+      message: `Error duplicating ad set: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error: error.message || 'Unknown error',
+      details: error.response?.body || error
     };
   }
 };
