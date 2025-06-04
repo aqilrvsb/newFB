@@ -1112,29 +1112,17 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Create proper targeting regardless of input
-          const properTargeting = {
-            age_min: 18,
-            age_max: 65,
-            genders: [1, 2],
-            geo_locations: {
-              countries: ['MY']
-            },
-            publisher_platforms: ['facebook'],
-            facebook_positions: ['feed']
-          };
-
-          const params = {
+          const params: any = {
             name: name,
             campaign_id: campaignId,
-            daily_budget: budget * 100, // Convert to cents
+            status: 'PAUSED',
+            targeting: targeting,
+            optimization_goal: 'LINK_CLICKS',
             billing_event: 'IMPRESSIONS',
-            optimization_goal: 'LINK_CLICKS', // For TRAFFIC campaigns
-            targeting: properTargeting,
-            status: 'PAUSED' // Start paused for safety
+            daily_budget: budget * 100 // Convert to cents
           };
 
-          const fieldsToRead = ['id', 'name', 'status', 'daily_budget', 'campaign_id'];
+          const fieldsToRead = ['id', 'name', 'status', 'optimization_goal', 'billing_event', 'daily_budget'];
           const result = await adAccount.createAdSet(fieldsToRead, params);
 
           return {
@@ -1144,16 +1132,25 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
               adSetId: result.id,
               name: result._data?.name,
               status: result._data?.status,
+              optimizationGoal: result._data?.optimization_goal,
+              billingEvent: result._data?.billing_event,
               dailyBudget: result._data?.daily_budget ? result._data.daily_budget / 100 : null,
-              campaignId: result._data?.campaign_id,
+              campaignId: campaignId,
               message: 'Ad Set created successfully'
             }
           };
         } catch (error) {
+          console.error('Detailed ad set creation error:', error);
           return {
             success: false,
             error: `Error creating ad set: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            tool: 'create_ad_set'
+            tool: 'create_ad_set',
+            debugInfo: {
+              errorType: typeof error,
+              errorName: error instanceof Error ? error.name : 'Unknown',
+              errorCode: error instanceof Error && 'code' in error ? error.code : 'No code',
+              fullError: error instanceof Error ? error.toString() : JSON.stringify(error)
+            }
           };
         }
 
