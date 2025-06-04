@@ -1653,9 +1653,8 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Enhanced creative format using real Facebook page IDs
+          // Enhanced creative format using real Facebook page IDs (FIXED)
           const defaultCreative = {
-            name: "Default Ad Creative",
             object_story_spec: {
               page_id: "514433091762412", // Use real page ID from user's pages
               link_data: {
