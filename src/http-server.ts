@@ -327,7 +327,7 @@ app.get('/test-deploy', (req, res) => {
 });
 
 // Stream endpoint for n8n MCP Client compatibility (GET for SSE, POST for MCP messages)
-app.get('/stream', (req, res) => {
+app.get('/stream/:userId?', (req, res) => {
   // Set headers for SSE (Server-Sent Events)
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -338,7 +338,7 @@ app.get('/stream', (req, res) => {
   });
 
   // Send initial connection message
-  res.write('data: {"type":"connection","status":"connected","message":"Facebook MCP Server stream ready"}\n\n');
+  const userId = req.params.userId; res.write(`data: {"type":"connection","status":"connected","message":"Facebook MCP Server stream ready","userId":"${userId || 'none'}"}\n\n`);
 
   // Keep connection alive with periodic heartbeat
   const heartbeat = setInterval(() => {
@@ -356,7 +356,7 @@ app.get('/stream', (req, res) => {
 });
 
 // Handle POST requests to /stream (n8n MCP Client compatibility)
-app.post('/stream', async (req, res) => {
+app.post('/stream/:userId?', async (req, res) => {
   try {
     const { jsonrpc, method, params, id } = req.body;
 
@@ -422,7 +422,22 @@ app.post('/stream', async (req, res) => {
         const toolArgs = params.arguments || {};
         
         // Extract userId from the request (you'll need to pass this)
-        const userId = (req.headers['x-user-id'] as string) || '8855dc9c-1ce1-41b6-a4b1-235ceeae722f'; // Use current session as fallback
+        // Extract userId dynamically from multiple sources
+        const userId = req.params.userId || 
+                      (req.headers['x-user-id'] as string) || 
+                      req.body.sessionId || 
+                      req.query.sessionId as string;
+        
+        if (!userId) {
+          return res.status(400).json({
+            jsonrpc: '2.0',
+            id: id,
+            error: {
+              code: -32602,
+              message: 'Session ID required. Provide via URL parameter (/stream/SESSION_ID), X-User-ID header, or sessionId in body/query.'
+            }
+          });
+        }
         
         try {
           const result = await processMcpToolCall(toolName, toolArgs, userId);
