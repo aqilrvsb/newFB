@@ -1209,7 +1209,19 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             return {
               success: false,
               error: 'campaignId, name, targeting, and budget are required',
-              tool: 'create_ad_set'
+              tool: 'create_ad_set',
+              requirements: {
+                campaignId: 'Campaign ID (string)',
+                name: 'Ad set name (string)',
+                targeting: 'Targeting object with geo_locations.countries, age_min, age_max',
+                budget: 'Daily budget in MYR (will be converted to cents automatically)'
+              },
+              example: {
+                campaignId: '120228357276280312',
+                name: 'My Ad Set',
+                budget: 10,
+                targeting: { geo_locations: { countries: ['MY'] }, age_min: 18, age_max: 65 }
+              }
             };
           }
 
@@ -1245,15 +1257,44 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Enhanced ad set creation with proper targeting and budget
+          // Get campaign details to determine proper optimization goal
+          const campaignResponse = await fetch(`https://graph.facebook.com/v23.0/${campaignId}?fields=objective&access_token=${session.credentials.facebookAccessToken}`);
+          const campaignData: any = await campaignResponse.json();
+          
+          if (campaignData.error) {
+            return {
+              success: false,
+              error: `Cannot get campaign objective: ${campaignData.error.message}`,
+              tool: 'create_ad_set'
+            };
+          }
+
+          // Set optimization goal and billing event based on campaign objective
+          let optimizationGoal = 'POST_ENGAGEMENT';
+          let billingEvent = 'IMPRESSIONS';
+          
+          const objective = campaignData.objective;
+          if (objective === 'OUTCOME_TRAFFIC') {
+            optimizationGoal = 'LINK_CLICKS';
+            billingEvent = 'LINK_CLICKS';
+          } else if (objective === 'OUTCOME_ENGAGEMENT') {
+            optimizationGoal = 'POST_ENGAGEMENT';
+            billingEvent = 'IMPRESSIONS';
+          } else if (objective === 'OUTCOME_LEADS') {
+            optimizationGoal = 'LEAD_GENERATION';
+            billingEvent = 'IMPRESSIONS';
+          }
+
+          // Fixed ad set creation with all required Facebook API v23 parameters
           const params: any = {
-            campaign_id: campaignId,
             name: name,
-            status: 'PAUSED', // Start paused for safety
+            campaign_id: campaignId,
+            daily_budget: Math.max(budget * 100, 1000), // Convert to cents (RM10 minimum = 1000 sen)
+            billing_event: billingEvent,
+            optimization_goal: optimizationGoal,
+            bid_strategy: 'LOWEST_COST_WITHOUT_CAP', // Recommended for safety
             targeting: targeting,
-            optimization_goal: 'LINK_CLICKS', // Better default for traffic campaigns
-            billing_event: 'LINK_CLICKS', // Better default billing event
-            daily_budget: Math.max(budget * 100, 500), // Convert to cents, minimum RM5
+            status: 'PAUSED', // Always start paused for safety
             special_ad_categories: [] // Required by Facebook for compliance
           };
 
@@ -1274,8 +1315,15 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             tool: 'create_ad_set',
             result: {
               adSetId: adSetData.id,
-              adSetData: adSetData,
-              message: 'Ad Set created successfully using working implementation'
+              adSetData: {
+                ...adSetData,
+                campaignObjective: objective,
+                optimizationGoal: optimizationGoal,
+                billingEvent: billingEvent,
+                budgetMYR: budget,
+                budgetCents: params.daily_budget
+              },
+              message: `Ad Set created successfully for ${objective} campaign with ${optimizationGoal} optimization`
             }
           };
         } catch (error: any) {
