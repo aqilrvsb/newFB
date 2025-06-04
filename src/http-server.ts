@@ -316,6 +316,35 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Stream endpoint for n8n MCP Client compatibility
+app.get('/stream', (req, res) => {
+  // Set headers for SSE (Server-Sent Events)
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Cache-Control'
+  });
+
+  // Send initial connection message
+  res.write('data: {"type":"connection","status":"connected","message":"Facebook MCP Server stream ready"}\n\n');
+
+  // Keep connection alive with periodic heartbeat
+  const heartbeat = setInterval(() => {
+    res.write('data: {"type":"heartbeat","timestamp":"' + new Date().toISOString() + '"}\n\n');
+  }, 30000); // Every 30 seconds
+
+  // Clean up on client disconnect
+  req.on('close', () => {
+    clearInterval(heartbeat);
+  });
+
+  req.on('aborted', () => {
+    clearInterval(heartbeat);
+  });
+});
+
 app.post('/auth', async (req, res) => {
   try {
     const { facebookAppId, facebookAppSecret, facebookAccessToken } = req.body;
