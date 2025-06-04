@@ -1235,7 +1235,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Ensure minimum required targeting with advantage_audience
+          // Ensure minimum required targeting
           if (!targeting.geo_locations || !targeting.geo_locations.countries || targeting.geo_locations.countries.length === 0) {
             return {
               success: false,
@@ -1248,9 +1248,6 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           // Set default age ranges only if not provided
           if (!targeting.age_min) targeting.age_min = 18;
           if (!targeting.age_max) targeting.age_max = 65;
-          
-          // Add required advantage_audience parameter to targeting
-          targeting.targeting_automation = { advantage_audience: 0 };
           const adAccount = getAdAccountForUser(userId);
           if (!adAccount) {
             return {
@@ -1507,18 +1504,11 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Use Facebook /copies endpoint with advantage_audience in targeting
+          // Use Facebook /copies endpoint (simple approach)
           const params = new URLSearchParams();
           params.append('name', newName || 'Ad Set Copy');
           params.append('deep_copy', 'true');
           params.append('status_option', 'PAUSED');
-          
-          // Add targeting with advantage_audience parameter
-          const targetingWithAdvantage = {
-            targeting_automation: { advantage_audience: 0 }
-          };
-          params.append('targeting', JSON.stringify(targetingWithAdvantage));
-          
           params.append('access_token', session.credentials.facebookAccessToken);
 
           const response = await fetch(`https://graph.facebook.com/v23.0/${adSetId}/copies`, {
