@@ -96,37 +96,55 @@ export const updateAdSet = async (
   }
 };
 
-// Duplicate Ad Set
+// Duplicate Ad Set using Facebook's /copies endpoint
 export const duplicateAdSet = async (
   userId: string,
   adSetId: string,
   newName?: string
 ) => {
   try {
-    const adAccount = getAdAccount(userId);
     const originalAdSet = new AdSet(adSetId);
-    const adSetDetails = await originalAdSet.get([
-      'name', 'campaign_id', 'targeting', 'optimization_goal', 'billing_event'
-    ]);
     
+    // Get original ad set details to use in copy name
+    const adSetDetails = await originalAdSet.get(['name']);
+    const copyName = newName || `${adSetDetails._data?.name} - Copy`;
+    
+    // Use Facebook's copies endpoint with advantage_audience parameter
     const params: any = {
-      name: newName || `${adSetDetails._data?.name} - Copy`,
-      campaign_id: adSetDetails._data?.campaign_id,
-      targeting: adSetDetails._data?.targeting,
-      optimization_goal: adSetDetails._data?.optimization_goal || 'LINK_CLICKS',
-      billing_event: adSetDetails._data?.billing_event || 'LINK_CLICKS',
-      bid_amount: 50, // Use fixed bid amount that works
-      status: 'PAUSED',
-      special_ad_categories: []
+      deep_copy: false,
+      status_option: 'PAUSED'
     };
     
-    const fieldsToRead = ['id', 'name', 'status'];
-    const result = await adAccount.createAdSet(fieldsToRead, params);
+    // Set the name directly if provided
+    if (newName) {
+      params.name = newName;
+    } else {
+      params.rename_options = {
+        rename_suffix: ' - Copy'
+      };
+    }
+    
+    // Add advantage_audience parameter to satisfy Facebook's requirement
+    params.targeting = {
+      targeting_automation: {
+        advantage_audience: 0  // Set to 0 to disable advantage audience
+      }
+    };
+    
+    // Use the Facebook Graph API directly for copies endpoint
+    const { FacebookApi } = require('facebook-nodejs-business-sdk');
+    const api = FacebookApi.init(process.env.FACEBOOK_ACCESS_TOKEN || '');
+    
+    const copyResult = await api.call(
+      'POST',
+      `/${adSetId}/copies`,
+      params
+    );
     
     return {
       success: true,
-      adSetId: result.id,
-      message: 'Ad set duplicated successfully'
+      adSetId: copyResult.copied_adset_id,
+      message: 'Ad set duplicated successfully using Facebook copies endpoint'
     };
   } catch (error) {
     return {
