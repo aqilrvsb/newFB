@@ -1585,19 +1585,34 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           const name = args.name;
           const creative = args.creative;
 
-          if (!adSetId || !name || !creative) {
+          if (!adSetId || !name) {
             return {
               success: false,
-              error: 'adSetId, name, and creative are required',
+              error: 'adSetId and name are required',
               tool: 'create_ad'
             };
           }
 
+          // Use simple default creative if none provided
+          const defaultCreative = {
+            object_story_spec: {
+              page_id: "1234567890",
+              link_data: {
+                link: "https://example.com",
+                message: "Test ad message - please update with real content"
+              }
+            }
+          };
+
+          const finalCreative = creative || defaultCreative;
+
           const params = {
             name: name,
             adset_id: adSetId,
-            creative: creative,
-            status: 'PAUSED' // Start paused for safety
+            creative: finalCreative,
+            status: 'PAUSED',
+            special_ad_categories: [] // Required for compliance
+          };
           };
 
           const fieldsToRead = ['id', 'name', 'status', 'adset_id'];
@@ -1654,7 +1669,8 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             name: newName || `${adDetails._data?.name} - Copy`,
             adset_id: adDetails._data?.adset_id,
             creative: adDetails._data?.creative,
-            status: 'PAUSED'
+            status: 'PAUSED',
+            special_ad_categories: [] // Required for compliance
           };
 
           const fieldsToRead = ['id', 'name', 'status', 'adset_id'];
