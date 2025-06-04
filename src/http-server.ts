@@ -1149,7 +1149,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             status: 'PAUSED', // Start paused for safety
             targeting: targeting,
             optimization_goal: 'LINK_CLICKS', // For TRAFFIC campaigns
-            billing_event: 'IMPRESSIONS',
+            billing_event: 'LINK_CLICKS', // Must match optimization_goal
             daily_budget: budget * 100 // Convert to cents
           };
 
