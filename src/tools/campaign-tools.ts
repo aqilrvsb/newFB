@@ -1,7 +1,6 @@
 import { AdAccount, Campaign } from 'facebook-nodejs-business-sdk';
 import { getAdAccountForUser } from '../config.js';
 
-// Get AdAccount for a specific user
 const getAdAccount = (userId: string) => {
   const adAccount = getAdAccountForUser(userId);
   if (!adAccount) {
@@ -10,7 +9,6 @@ const getAdAccount = (userId: string) => {
   return adAccount;
 };
 
-// Create new campaign
 export const createCampaign = async (
   userId: string,
   name: string,
@@ -44,27 +42,29 @@ export const createCampaign = async (
     
     if (special_ad_categories && special_ad_categories.length > 0) {
       params.special_ad_categories = special_ad_categories;
+    } else {
+      params.special_ad_categories = [];
     }
     
     const fieldsToRead = ['id', 'name', 'objective', 'status', 'created_time', 'daily_budget'];
     const result: Campaign = await adAccount.createCampaign(fieldsToRead, params);
+    
     const campaignData = {
       id: result.id,
       name: result._data?.name,
       objective: result._data?.objective,
       status: result._data?.status,
       createdTime: result._data?.created_time,
-      dailyBudget: result._data?.daily_budget ? result._data.daily_budget / 100 : null,
+      dailyBudget: result._data?.daily_budget ? result._data.daily_budget / 100 : null
     };
 
     return {
       success: true,
       campaignId: campaignData.id,
       campaignData: campaignData,
-      message: 'Campaign created successfully and data loaded.'
+      message: 'Campaign created successfully'
     };
   } catch (error) {
-    console.error('Error creating campaign:', error);
     return {
       success: false,
       message: `Error creating campaign: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -72,15 +72,12 @@ export const createCampaign = async (
   }
 };
 
-// Get list of campaigns
 export const getCampaigns = async (userId: string, limit = 10, status?: string) => {
   try {
     const adAccount = getAdAccount(userId);
     
     const fields = ['id', 'name', 'objective', 'status', 'created_time', 'daily_budget'];
-    const params: any = {
-      limit
-    };
+    const params: any = { limit };
     
     if (status) {
       params.filtering = [
@@ -102,18 +99,17 @@ export const getCampaigns = async (userId: string, limit = 10, status?: string) 
         objective: campaign._data?.objective,
         status: campaign._data?.status,
         createdTime: campaign._data?.created_time,
-        dailyBudget: campaign._data?.daily_budget ? campaign._data.daily_budget / 100 : null,
+        dailyBudget: campaign._data?.daily_budget ? campaign._data.daily_budget / 100 : null
       }))
     };
   } catch (error) {
-    console.error('Error getting campaigns:', error);
     return {
       success: false,
       message: `Error getting campaigns: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 };
-// Update campaign
+
 export const updateCampaign = async (
   userId: string,
   campaignId: string,
@@ -123,10 +119,10 @@ export const updateCampaign = async (
   endTime?: string
 ) => {
   try {
-    getAdAccount(userId); // Verify session
     const campaign = new Campaign(campaignId);
     
     const params: any = {};
+    
     if (name) params.name = name;
     if (status) params.status = status;
     if (dailyBudget) params.daily_budget = dailyBudget * 100;
@@ -139,7 +135,6 @@ export const updateCampaign = async (
       message: 'Campaign updated successfully'
     };
   } catch (error) {
-    console.error('Error updating campaign:', error);
     return {
       success: false,
       message: `Error updating campaign: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -147,14 +142,12 @@ export const updateCampaign = async (
   }
 };
 
-// Get campaign details
 export const getCampaignDetails = async (userId: string, campaignId: string) => {
   try {
-    getAdAccount(userId); // Verify session
     const campaign = new Campaign(campaignId);
     
     const fields = [
-      'id', 'name', 'objective', 'status', 'created_time',
+      'id', 'name', 'objective', 'status', 'created_time', 
       'start_time', 'stop_time', 'daily_budget', 'lifetime_budget',
       'spend_cap', 'budget_remaining', 'buying_type', 'special_ad_categories'
     ];
@@ -186,34 +179,14 @@ export const getCampaignDetails = async (userId: string, campaignId: string) => 
     };
   }
 };
-// Delete campaign
-export const deleteCampaign = async (userId: string, campaignId: string) => {
-  try {
-    getAdAccount(userId); // Verify session
-    const campaign = new Campaign(campaignId);
-    
-    await campaign.delete([]);
-    
-    return {
-      success: true,
-      message: 'Campaign deleted successfully'
-    };
-  } catch (error) {
-    console.error('Error deleting campaign:', error);
-    return {
-      success: false,
-      message: `Error deleting campaign: ${error instanceof Error ? error.message : 'Unknown error'}`
-    };
-  }
-};
-// Duplicate Campaign
+
 export const duplicateCampaign = async (
   userId: string,
   campaignId: string,
   newName?: string
 ) => {
   try {
-    const adAccount = getAdAccountForUser(userId);
+    const adAccount = getAdAccount(userId);
     const originalCampaign = new Campaign(campaignId);
     const campaignDetails = await originalCampaign.get([
       'name', 'objective', 'status', 'daily_budget', 'lifetime_budget', 
@@ -260,7 +233,6 @@ export const duplicateCampaign = async (
   }
 };
 
-// Delete Campaign
 export const deleteCampaign = async (userId: string, campaignId: string) => {
   try {
     const campaign = new Campaign(campaignId);
