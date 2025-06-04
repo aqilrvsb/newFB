@@ -1219,7 +1219,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
               success: false,
               error: 'Invalid targeting format. Provide: {"geo_locations": {"countries": ["YOUR_COUNTRY"]}, "age_min": 18, "age_max": 65}',
               tool: 'create_ad_set',
-              example: '{"geo_locations": {"countries": ["MY"]}, "age_min": 25, "age_max": 55}'
+              example: '{"geo_locations": {"countries": ["US"]}, "age_min": 25, "age_max": 55}'
             };
           }
 
@@ -1250,9 +1250,8 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             name: name,
             status: 'PAUSED', // Start paused for safety
             targeting: targeting,
-            optimization_goal: 'LINK_CLICKS', // For TRAFFIC campaigns
-            billing_event: 'LINK_CLICKS', // Must match optimization_goal
-            bid_amount: 50, // Required for LINK_CLICKS billing event (50 cents)
+            optimization_goal: 'REACH', // Facebook default for most campaigns
+            billing_event: 'IMPRESSIONS', // Facebook default billing
             daily_budget: budget * 100, // Convert to cents (Facebook requires cents)
             special_ad_categories: [] // Required by Facebook for compliance
           };
@@ -1458,8 +1457,8 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Get original ad set details using working Graph API approach
-          const response = await fetch(`https://graph.facebook.com/v23.0/${adSetId}?fields=name,campaign_id,daily_budget,targeting,billing_event,optimization_goal&access_token=${session.credentials.facebookAccessToken}`);
+          // Get original ad set details with more comprehensive fields
+          const response = await fetch(`https://graph.facebook.com/v23.0/${adSetId}?fields=name,campaign_id,daily_budget,lifetime_budget,targeting,billing_event,optimization_goal,status,start_time,end_time&access_token=${session.credentials.facebookAccessToken}`);
           const originalData: any = await response.json();
 
           if (originalData.error) {
@@ -1471,20 +1470,41 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Use our working createAdSet method with original data
-          const params = {
+          // Validate that we have required data
+          if (!originalData.campaign_id || !originalData.targeting) {
+            return {
+              success: false,
+              error: 'Original ad set missing required data (campaign_id or targeting)',
+              tool: 'duplicate_ad_set',
+              debug: originalData
+            };
+          }
+
+          // Use our working createAdSet method with exact original data
+          const params: any = {
             name: newName || `${originalData.name} - Copy`,
             campaign_id: originalData.campaign_id,
-            daily_budget: originalData.daily_budget || 5000, // Default RM50
-            targeting: originalData.targeting || {
-              age_min: 18,
-              age_max: 65,
-              geo_locations: { countries: ['MY'] }
-            },
-            billing_event: originalData.billing_event || 'LINK_CLICKS',
-            optimization_goal: originalData.optimization_goal || 'LINK_CLICKS',
+            targeting: originalData.targeting, // Use exact original targeting
             status: 'PAUSED' // Always create as paused for safety
           };
+
+          // Add budget (prefer daily_budget, fallback to lifetime_budget scaled down)
+          if (originalData.daily_budget) {
+            params.daily_budget = originalData.daily_budget;
+          } else if (originalData.lifetime_budget) {
+            // Convert lifetime to daily (estimate 30 days)
+            params.daily_budget = Math.floor(originalData.lifetime_budget / 30);
+          } else {
+            params.daily_budget = 5000; // Minimum sensible default (RM50)
+          }
+
+          // Add optimization settings if available
+          if (originalData.billing_event) {
+            params.billing_event = originalData.billing_event;
+          }
+          if (originalData.optimization_goal) {
+            params.optimization_goal = originalData.optimization_goal;
+          }
 
           const adAccount = getAdAccountForUser(userId);
           if (!adAccount) {
