@@ -1504,11 +1504,12 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Use Facebook /copies endpoint (the correct way)
+          // Use Facebook /copies endpoint (the correct way) with advantage_audience fix
           const params = new URLSearchParams();
           params.append('name', newName || 'Ad Set Copy');
           params.append('deep_copy', 'true');
           params.append('status_option', 'PAUSED');
+          params.append('targeting_automation', JSON.stringify({ advantage_audience: 1 }));
           params.append('access_token', session.credentials.facebookAccessToken);
 
           const response = await fetch(`https://graph.facebook.com/v23.0/${adSetId}/copies`, {
