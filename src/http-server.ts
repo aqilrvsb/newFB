@@ -1806,65 +1806,55 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Alternative approach: Create ad with inline creative specification
-          // First, get the creative details
-          const AdCreative = require('facebook-nodejs-business-sdk').AdCreative;
-          const creative = new AdCreative(creativeId);
-          
-          try {
-            const creativeData = await creative.get(['object_story_spec', 'name']);
-            
-            const params = {
-              name: name,
-              adset_id: adSetId,
-              creative: {
-                creative_id: creativeId
-              },
-              status: 'PAUSED'
-            };
-
-            const fieldsToRead = ['id', 'name', 'status', 'adset_id'];
-            const result = await adAccount.createAd(fieldsToRead, params);
-
+          // Try simpler approach with direct Graph API call
+          const session = userSessionManager.getSession(userId);
+          if (!session) {
             return {
-              success: true,
-              tool: 'create_ad',
-              result: {
-                adId: result.id,
-                name: result._data?.name,
-                status: result._data?.status,
-                adSetId: result._data?.adset_id,
-                creativeId: creativeId,
-                message: 'Ad created successfully with existing creative'
-              }
-            };
-          } catch (creativeError) {
-            // If creative retrieval fails, try direct approach
-            const params = {
-              name: name,
-              adset_id: adSetId,
-              creative: {
-                creative_id: creativeId
-              },
-              status: 'PAUSED'
-            };
-
-            const fieldsToRead = ['id', 'name', 'status', 'adset_id'];
-            const result = await adAccount.createAd(fieldsToRead, params);
-
-            return {
-              success: true,
-              tool: 'create_ad',
-              result: {
-                adId: result.id,
-                name: result._data?.name,
-                status: result._data?.status,
-                adSetId: result._data?.adset_id,
-                creativeId: creativeId,
-                message: 'Ad created successfully'
-              }
+              success: false,
+              error: 'User session not found or expired',
+              tool: 'create_ad'
             };
           }
+
+          const response = await fetch(`https://graph.facebook.com/v18.0/${adAccount.id}/ads`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.credentials.facebookAccessToken}`
+            },
+            body: JSON.stringify({
+              name: name,
+              adset_id: adSetId,
+              creative: {
+                creative_id: creativeId
+              },
+              status: 'PAUSED'
+            })
+          });
+
+          const result: any = await response.json();
+
+          if (result.error) {
+            return {
+              success: false,
+              error: `Facebook API Error: ${result.error.message}`,
+              tool: 'create_ad',
+              details: result.error
+            };
+          }
+
+          return {
+            success: true,
+            tool: 'create_ad',
+            result: {
+              adId: result.id,
+              name: name,
+              status: 'PAUSED',
+              adSetId: adSetId,
+              creativeId: creativeId,
+              message: 'Ad created successfully using Graph API'
+            }
+          };
         } catch (error: any) {
           // Enhanced error handling for Facebook ad creation with detailed debugging
           let errorMessage = `Error creating ad: ${error instanceof Error ? error.message : 'Unknown error'}`;
