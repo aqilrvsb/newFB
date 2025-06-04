@@ -316,6 +316,16 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Test endpoint to verify deployment
+app.get('/test-deploy', (req, res) => {
+  res.json({
+    status: 'deployed',
+    timestamp: new Date().toISOString(),
+    message: 'Stream endpoint should be available',
+    deployTime: '2025-06-05-01-22-00'
+  });
+});
+
 // Stream endpoint for n8n MCP Client compatibility
 app.get('/stream', (req, res) => {
   // Set headers for SSE (Server-Sent Events)
