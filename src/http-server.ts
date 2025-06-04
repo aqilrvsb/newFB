@@ -326,7 +326,7 @@ app.get('/test-deploy', (req, res) => {
   });
 });
 
-// Stream endpoint for n8n MCP Client compatibility
+// Stream endpoint for n8n MCP Client compatibility (GET for SSE, POST for MCP messages)
 app.get('/stream', (req, res) => {
   // Set headers for SSE (Server-Sent Events)
   res.writeHead(200, {
@@ -352,6 +352,24 @@ app.get('/stream', (req, res) => {
 
   req.on('aborted', () => {
     clearInterval(heartbeat);
+  });
+});
+
+// Handle POST requests to /stream (n8n MCP Client compatibility)
+app.post('/stream', async (req, res) => {
+  res.json({
+    jsonrpc: '2.0',
+    id: req.body.id || 1,
+    result: {
+      protocolVersion: '2024-11-05',
+      capabilities: {
+        tools: {}
+      },
+      serverInfo: {
+        name: 'facebook-ads-mcp',
+        version: '1.0.0'
+      }
+    }
   });
 });
 
