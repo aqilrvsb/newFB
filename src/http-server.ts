@@ -849,6 +849,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             name: args.name,
             objective: args.objective || 'OUTCOME_LEADS',
             status: args.status || 'PAUSED',
+            special_ad_categories: [], // Required by Facebook for compliance
             access_token: session.credentials.facebookAccessToken
           };
 
@@ -1150,7 +1151,8 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             targeting: targeting,
             optimization_goal: 'LINK_CLICKS', // For TRAFFIC campaigns
             billing_event: 'LINK_CLICKS', // Must match optimization_goal
-            daily_budget: budget * 100 // Convert to cents
+            daily_budget: budget * 100, // Convert to cents
+            special_ad_categories: [] // Required by Facebook for compliance
           };
 
           const fieldsToRead = ['id', 'name', 'status', 'optimization_goal', 'billing_event', 'daily_budget'];
