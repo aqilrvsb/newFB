@@ -1112,23 +1112,25 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
+          // Create proper targeting regardless of input
+          const properTargeting = {
+            age_min: 18,
+            age_max: 65,
+            genders: [1, 2],
+            geo_locations: {
+              countries: ['MY']
+            },
+            publisher_platforms: ['facebook'],
+            facebook_positions: ['feed']
+          };
+
           const params = {
             name: name,
             campaign_id: campaignId,
             daily_budget: budget * 100, // Convert to cents
             billing_event: 'IMPRESSIONS',
             optimization_goal: 'LINK_CLICKS', // For TRAFFIC campaigns
-            targeting: {
-              age_min: 18,
-              age_max: 65,
-              genders: [1, 2], // All genders
-              geo_locations: {
-                countries: targeting.countries || ['MY']
-              },
-              publisher_platforms: ['facebook', 'instagram'],
-              facebook_positions: ['feed'],
-              instagram_positions: ['stream']
-            },
+            targeting: properTargeting,
             status: 'PAUSED' // Start paused for safety
           };
 
