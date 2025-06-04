@@ -702,8 +702,31 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
         
       case 'get_campaigns':
         try {
+          const limit = args.limit || 10;
+          const status = args.status;
+
+          // Use working implementation from tools
+          const result = await campaignTools.getCampaigns(userId, limit, status);
+
+          return {
+            success: result.success,
+            tool: 'get_campaigns',
+            result: result.success ? {
+              campaigns: result.campaigns,
+              message: 'Campaigns retrieved successfully'
+            } : undefined,
+            error: result.success ? undefined : result.message
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error getting campaigns: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'get_campaigns'
+          };
+        }
+        try {
           // Get ALL user's ad accounts
-          const response = await fetch(`https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name,account_status,currency,timezone_name&access_token=${session.credentials.facebookAccessToken}`);
+          const response = await fetch(`https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name,account_status,currency,timezone_name&access_token=${session!.credentials.facebookAccessToken}`);
           const accountsData: any = await response.json();
           
           if (accountsData.error) {
@@ -748,7 +771,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
 
           for (const account of accountsToProcess) {
             try {
-              const campaignsResponse = await fetch(`https://graph.facebook.com/v18.0/${account.id}/campaigns?fields=id,name,objective,status,created_time,account_id&limit=${args.limit || 25}&access_token=${session.credentials.facebookAccessToken}`);
+              const campaignsResponse = await fetch(`https://graph.facebook.com/v18.0/${account.id}/campaigns?fields=id,name,objective,status,created_time,account_id&limit=${args.limit || 25}&access_token=${session!.credentials.facebookAccessToken}`);
               const campaignsData: any = await campaignsResponse.json();
 
               if (campaignsData.data) {
@@ -797,7 +820,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
               ? `Campaigns retrieved from account ${targetAccountId}` 
               : `Campaigns retrieved from ${accountSummaries.length} accounts`
           };
-        } catch (error) {
+        } catch (error: any) {
           return {
             success: false,
             error: `API Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
