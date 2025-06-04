@@ -1132,44 +1132,61 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Use the working implementation from tools
-          const result = await adSetTools.createAdSet(
-            userId,
-            campaignId,
-            name,
-            'PAUSED', // status
-            targeting,
-            'LINK_CLICKS', // optimizationGoal for TRAFFIC campaigns
-            'IMPRESSIONS', // billingEvent
-            undefined, // bidAmount
-            budget * 100, // dailyBudget in cents
-            undefined, // lifetimeBudget
-            undefined, // startTime
-            undefined  // endTime
-          );
-
-          if (result.success) {
-            return {
-              success: true,
-              tool: 'create_ad_set',
-              result: {
-                adSetId: result.adSetId,
-                adSetData: result.adSetData,
-                message: result.message
-              }
-            };
-          } else {
+          // Get the selected ad account for this user
+          const adAccount = getAdAccountForUser(userId);
+          if (!adAccount) {
             return {
               success: false,
-              error: result.message,
+              error: 'No ad account selected. Use select_ad_account first.',
               tool: 'create_ad_set'
             };
           }
-        } catch (error) {
-          console.error('Error in create_ad_set:', error);
+
+          // Use the EXACT working implementation from MCP-Facebook-main
+          const params: any = {
+            campaign_id: campaignId,
+            name: name,
+            status: 'PAUSED', // Start paused for safety
+            targeting: targeting,
+            optimization_goal: 'LINK_CLICKS', // For TRAFFIC campaigns
+            billing_event: 'IMPRESSIONS',
+            daily_budget: budget * 100 // Convert to cents
+          };
+
+          const fieldsToRead = ['id', 'name', 'status', 'optimization_goal', 'billing_event', 'daily_budget'];
+          const adSet = await adAccount.createAdSet(fieldsToRead, params);
+
+          const adSetData = {
+            id: adSet.id,
+            name: adSet._data?.name,
+            status: adSet._data?.status,
+            optimizationGoal: adSet._data?.optimization_goal,
+            billingEvent: adSet._data?.billing_event,
+            dailyBudget: adSet._data?.daily_budget ? adSet._data.daily_budget / 100 : null
+          };
+
+          return {
+            success: true,
+            tool: 'create_ad_set',
+            result: {
+              adSetId: adSetData.id,
+              adSetData: adSetData,
+              message: 'Ad Set created successfully using working implementation'
+            }
+          };
+        } catch (error: any) {
+          // Use the same error handling as the working version
+          let errorMessage = `Error creating ad set: ${error instanceof Error ? error.message : 'Unknown error'}`;
+          if (error && typeof error === 'object' && 'response' in error) {
+            const fbError = error.response?.data?.error;
+            if (fbError) {
+              errorMessage = `Facebook API Error (${fbError.code}): ${fbError.message}`;
+            }
+          }
+          
           return {
             success: false,
-            error: `Error creating ad set: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            error: errorMessage,
             tool: 'create_ad_set'
           };
         }
