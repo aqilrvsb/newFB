@@ -422,7 +422,7 @@ app.post('/stream', async (req, res) => {
         const toolArgs = params.arguments || {};
         
         // Extract userId from the request (you'll need to pass this)
-        const userId = (req.headers['x-user-id'] as string) || '2df9ff22-bc93-4e2b-bb37-c489543a9659'; // Use current session as fallback
+        const userId = (req.headers['x-user-id'] as string) || '8855dc9c-1ce1-41b6-a4b1-235ceeae722f'; // Use current session as fallback
         
         try {
           const result = await processMcpToolCall(toolName, toolArgs, userId);
