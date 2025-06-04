@@ -1707,8 +1707,11 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             }
           };
         } catch (error: any) {
-          // Enhanced error handling for Facebook ad creation
+          // Enhanced error handling for Facebook ad creation with detailed debugging
           let errorMessage = `Error creating ad: ${error instanceof Error ? error.message : 'Unknown error'}`;
+          
+          // Log the full error for debugging
+          console.error('Facebook Ad Creation Error:', error);
           
           // Provide specific guidance for common Facebook ad creation errors
           if (error && typeof error === 'object' && 'response' in error) {
@@ -1718,15 +1721,21 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
               
               // Add helpful suggestions for common errors
               if (fbError.message.includes('page_id')) {
-                errorMessage += '\n\nSuggestion: Update the creative.object_story_spec.page_id with a real Facebook Page ID that you manage.';
+                errorMessage += '\n\nSuggestion: The page_id in creative must be a Facebook Page you manage. Use get_facebook_pages to find valid page IDs.';
               }
               if (fbError.message.includes('creative')) {
-                errorMessage += '\n\nSuggestion: Provide proper creative content including valid page_id, link, and message.';
+                errorMessage += '\n\nSuggestion: Check creative format - ensure object_story_spec.page_id and link_data are properly formatted.';
               }
               if (fbError.message.includes('adset_id')) {
-                errorMessage += '\n\nSuggestion: Ensure the ad set exists and is in ACTIVE or PAUSED status.';
+                errorMessage += '\n\nSuggestion: Ensure the ad set exists, is active, and belongs to the selected ad account.';
+              }
+              if (fbError.message.includes('Invalid parameter')) {
+                errorMessage += '\n\nDebug Info: Check ad set status, campaign status, and creative format. Ad set must be active or paused (not deleted).';
               }
             }
+          } else {
+            // Add generic debugging info
+            errorMessage += `\n\nDebug Info: Ad Set ID: ${args.adSetId}, Creative provided: ${!!args.creative}`;
           }
           
           return {
