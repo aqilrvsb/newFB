@@ -198,7 +198,7 @@ app.get('/get-user-id', (req, res) => {
                         "command": "node",
                         "args": [
                             "-e",
-                            "const https = require('https'); const readline = require('readline'); const USER_ID = '" + userId + "'; const BASE_URL = 'newfb-production.up.railway.app'; const rl = readline.createInterface({ input: process.stdin, output: process.stdout }); function sendRequest(method, params = {}) { return new Promise((resolve, reject) => { const postData = JSON.stringify({ method, params }); const options = { hostname: BASE_URL, port: 443, path: \\\`/mcp/\\\${USER_ID}\\\`, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(postData) } }; const req = https.request(options, (res) => { let data = ''; res.on('data', (chunk) => { data += chunk; }); res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(new Error('Invalid JSON response')); } }); }); req.on('error', reject); req.write(postData); req.end(); }); } rl.on('line', async (line) => { try { const message = JSON.parse(line); if (message.method === 'initialize') { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'facebook-ads-http', version: '1.0.0' } } })); } else if (message.method === 'notifications/initialized') { return; } else if (message.method === 'tools/list') { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { tools: [ { name: 'create_campaign', description: 'Creates a new ad campaign', inputSchema: { type: 'object', properties: { name: { type: 'string' }, objective: { type: 'string' }, status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] } }, required: ['name', 'objective'] } }, { name: 'get_ad_accounts', description: 'Get list of available Facebook ad accounts', inputSchema: { type: 'object', properties: {} } }, { name: 'select_ad_account', description: 'Select a specific Facebook ad account to use', inputSchema: { type: 'object', properties: { accountId: { type: 'string', description: 'Facebook Ad Account ID (e.g., act_1234567890)' } }, required: ['accountId'] } }, { name: 'get_campaigns', description: 'Lists existing campaigns', inputSchema: { type: 'object', properties: { limit: { type: 'number', default: 25 } } } }, { name: 'get_campaign_details', description: 'Gets details for a specific campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string', description: 'Campaign ID' } }, required: ['campaignId'] } }, { name: 'update_campaign', description: 'Updates an existing campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, name: { type: 'string' }, status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] } }, required: ['campaignId'] } }, { name: 'delete_campaign', description: 'Deletes a campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' } }, required: ['campaignId'] } }, { name: 'create_custom_audience', description: 'Creates a custom, website, or engagement audience', inputSchema: { type: 'object', properties: { name: { type: 'string' }, type: { type: 'string', enum: ['CUSTOM', 'WEBSITE', 'ENGAGEMENT'] }, description: { type: 'string' } }, required: ['name', 'type'] } }, { name: 'get_audiences', description: 'Lists available custom audiences', inputSchema: { type: 'object', properties: { limit: { type: 'number', default: 25 } } } }, { name: 'create_lookalike_audience', description: 'Creates a lookalike audience', inputSchema: { type: 'object', properties: { name: { type: 'string' }, sourceAudienceId: { type: 'string' }, country: { type: 'string' }, ratio: { type: 'number', minimum: 1, maximum: 10 } }, required: ['name', 'sourceAudienceId', 'country'] } }, { name: 'create_ad_set', description: 'Creates a new ad set', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, name: { type: 'string' }, targeting: { type: 'object' }, budget: { type: 'number' } }, required: ['campaignId', 'name', 'targeting', 'budget'] } }, { name: 'get_campaign_insights', description: 'Retrieves performance insights for a campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, dateRange: { type: 'string', enum: ['today', 'yesterday', 'last_7_days', 'last_30_days'] } }, required: ['campaignId'] } }, { name: 'duplicate_campaign', description: 'Duplicates an existing campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, newName: { type: 'string' } }, required: ['campaignId'] } }, { name: 'update_ad_set', description: 'Updates an existing ad set', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' }, name: { type: 'string' }, status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] }, dailyBudget: { type: 'number' } }, required: ['adSetId'] } }, { name: 'delete_ad_set', description: 'Deletes an ad set', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' } }, required: ['adSetId'] } }, { name: 'duplicate_ad_set', description: 'Duplicates an existing ad set', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' }, newName: { type: 'string' } }, required: ['adSetId'] } }, { name: 'get_ad_set_insights', description: 'Retrieves performance insights for an ad set', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' }, dateRange: { type: 'string', enum: ['today', 'yesterday', 'last_7_days', 'last_30_days'] } }, required: ['adSetId'] } }, { name: 'update_custom_audience', description: 'Updates an existing custom audience', inputSchema: { type: 'object', properties: { audienceId: { type: 'string' }, name: { type: 'string' }, description: { type: 'string' } }, required: ['audienceId'] } }, { name: 'create_ad', description: 'Creates a new ad', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' }, name: { type: 'string' }, creativeId: { type: 'string' } }, required: ['adSetId', 'name'] } }, { name: 'create_ad_creative', description: 'Creates a new ad creative', inputSchema: { type: 'object', properties: { name: { type: 'string' }, pageId: { type: 'string' }, link: { type: 'string' }, message: { type: 'string' } }, required: ['name'] } }, { name: 'duplicate_ad', description: 'Duplicates an existing ad', inputSchema: { type: 'object', properties: { adId: { type: 'string' }, newName: { type: 'string' } }, required: ['adId'] } }, { name: 'update_ad', description: 'Updates an existing ad', inputSchema: { type: 'object', properties: { adId: { type: 'string' }, name: { type: 'string' }, status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] }, creative: { type: 'object' } }, required: ['adId'] } }, { name: 'delete_ad', description: 'Deletes an ad', inputSchema: { type: 'object', properties: { adId: { type: 'string' } }, required: ['adId'] } }, { name: 'get_ad_insights', description: 'Retrieves performance insights for an ad', inputSchema: { type: 'object', properties: { adId: { type: 'string' }, dateRange: { type: 'string', enum: ['today', 'yesterday', 'last_7_days', 'last_30_days'] } }, required: ['adId'] } }, { name: 'get_facebook_pages', description: 'Get user\\'s Facebook pages for ad creation', inputSchema: { type: 'object', properties: {} } }, { name: 'generate_campaign_prompt', description: 'Generates a prompt for campaign creation using a template', inputSchema: { type: 'object', properties: { objective: { type: 'string' }, industry: { type: 'string' }, target_audience: { type: 'string' } }, required: ['objective'] } } ] } })); } else if (message.method === 'resources/list') { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { resources: [] } })); } else if (message.method === 'prompts/list') { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { prompts: [] } })); } else if (message.method === 'tools/call') { try { const result = await sendRequest(message.params.name, message.params.arguments || {}); console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] } })); } catch (error) { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, error: { code: -32603, message: error.message } })); } } else { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: {} })); } } catch (error) { console.error('Parse error:', error); } }); process.on('SIGINT', () => process.exit(0)); process.on('SIGTERM', () => process.exit(0));"
+                            "const https = require('https'); const readline = require('readline'); const USER_ID = '" + userId + "'; const BASE_URL = 'newfb-production.up.railway.app'; const rl = readline.createInterface({ input: process.stdin, output: process.stdout }); function sendRequest(method, params = {}) { return new Promise((resolve, reject) => { const postData = JSON.stringify({ method, params }); const options = { hostname: BASE_URL, port: 443, path: \\\`/mcp/\\\${USER_ID}\\\`, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(postData) } }; const req = https.request(options, (res) => { let data = ''; res.on('data', (chunk) => { data += chunk; }); res.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { reject(new Error('Invalid JSON response')); } }); }); req.on('error', reject); req.write(postData); req.end(); }); } rl.on('line', async (line) => { try { const message = JSON.parse(line); if (message.method === 'initialize') { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { protocolVersion: '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'facebook-ads-http', version: '1.0.0' } } })); } else if (message.method === 'notifications/initialized') { return; } else if (message.method === 'tools/list') { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { tools: [ { name: 'create_campaign', description: 'Creates a new ad campaign', inputSchema: { type: 'object', properties: { name: { type: 'string' }, objective: { type: 'string' }, status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] } }, required: ['name', 'objective'] } }, { name: 'get_ad_accounts', description: 'Get list of available Facebook ad accounts', inputSchema: { type: 'object', properties: {} } }, { name: 'select_ad_account', description: 'Select a specific Facebook ad account to use', inputSchema: { type: 'object', properties: { accountId: { type: 'string', description: 'Facebook Ad Account ID (e.g., act_1234567890)' } }, required: ['accountId'] } }, { name: 'get_campaigns', description: 'Lists existing campaigns', inputSchema: { type: 'object', properties: { limit: { type: 'number', default: 25 } } } }, { name: 'get_campaign_details', description: 'Gets details for a specific campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string', description: 'Campaign ID' } }, required: ['campaignId'] } }, { name: 'update_campaign', description: 'Updates an existing campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, name: { type: 'string' }, status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] } }, required: ['campaignId'] } }, { name: 'delete_campaign', description: 'Deletes a campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' } }, required: ['campaignId'] } }, { name: 'create_custom_audience', description: 'Creates a custom, website, or engagement audience', inputSchema: { type: 'object', properties: { name: { type: 'string' }, type: { type: 'string', enum: ['CUSTOM', 'WEBSITE', 'ENGAGEMENT'] }, description: { type: 'string' } }, required: ['name', 'type'] } }, { name: 'get_audiences', description: 'Lists available custom audiences', inputSchema: { type: 'object', properties: { limit: { type: 'number', default: 25 } } } }, { name: 'create_lookalike_audience', description: 'Creates a lookalike audience', inputSchema: { type: 'object', properties: { name: { type: 'string' }, sourceAudienceId: { type: 'string' }, country: { type: 'string' }, ratio: { type: 'number', minimum: 1, maximum: 10 } }, required: ['name', 'sourceAudienceId', 'country'] } }, { name: 'create_ad_set', description: 'Creates a new ad set', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, name: { type: 'string' }, targeting: { type: 'object' }, budget: { type: 'number' } }, required: ['campaignId', 'name', 'targeting', 'budget'] } }, { name: 'get_campaign_insights', description: 'Retrieves performance insights for a campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, dateRange: { type: 'string', enum: ['today', 'yesterday', 'last_7_days', 'last_30_days'] } }, required: ['campaignId'] } }, { name: 'duplicate_campaign', description: 'Duplicates an existing campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, newName: { type: 'string' } }, required: ['campaignId'] } }, { name: 'update_ad_set', description: 'Updates an existing ad set', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' }, name: { type: 'string' }, status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] }, dailyBudget: { type: 'number' } }, required: ['adSetId'] } }, { name: 'delete_ad_set', description: 'Deletes an ad set', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' } }, required: ['adSetId'] } }, { name: 'duplicate_ad_set', description: 'Duplicates an existing ad set', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' }, newName: { type: 'string' } }, required: ['adSetId'] } }, { name: 'get_ad_set_insights', description: 'Retrieves performance insights for an ad set', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' }, dateRange: { type: 'string', enum: ['today', 'yesterday', 'last_7_days', 'last_30_days'] } }, required: ['adSetId'] } }, { name: 'update_custom_audience', description: 'Updates an existing custom audience', inputSchema: { type: 'object', properties: { audienceId: { type: 'string' }, name: { type: 'string' }, description: { type: 'string' } }, required: ['audienceId'] } }, { name: 'create_ad', description: 'Creates a new ad', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' }, name: { type: 'string' }, creativeId: { type: 'string' } }, required: ['adSetId', 'name'] } }, { name: 'create_ad_creative', description: 'Creates a new ad creative', inputSchema: { type: 'object', properties: { name: { type: 'string' }, pageId: { type: 'string' }, link: { type: 'string' }, message: { type: 'string' } }, required: ['name'] } }, { name: 'duplicate_ad', description: 'Duplicates an existing ad', inputSchema: { type: 'object', properties: { adId: { type: 'string' }, newName: { type: 'string' } }, required: ['adId'] } }, { name: 'update_ad', description: 'Updates an existing ad', inputSchema: { type: 'object', properties: { adId: { type: 'string' }, name: { type: 'string' }, status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] }, creative: { type: 'object' } }, required: ['adId'] } }, { name: 'delete_ad', description: 'Deletes an ad', inputSchema: { type: 'object', properties: { adId: { type: 'string' } }, required: ['adId'] } }, { name: 'get_ad_insights', description: 'Retrieves performance insights for an ad', inputSchema: { type: 'object', properties: { adId: { type: 'string' }, dateRange: { type: 'string', enum: ['today', 'yesterday', 'last_7_days', 'last_30_days'] } }, required: ['adId'] } }, { name: 'get_facebook_pages', description: 'Get user\\'s Facebook pages with detailed permissions and ad readiness info', inputSchema: { type: 'object', properties: {} } }, { name: 'generate_campaign_prompt', description: 'Generates a prompt for campaign creation using a template', inputSchema: { type: 'object', properties: { objective: { type: 'string' }, industry: { type: 'string' }, target_audience: { type: 'string' } }, required: ['objective'] } } ] } })); } else if (message.method === 'resources/list') { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { resources: [] } })); } else if (message.method === 'prompts/list') { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { prompts: [] } })); } else if (message.method === 'tools/call') { try { const result = await sendRequest(message.params.name, message.params.arguments || {}); console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] } })); } catch (error) { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, error: { code: -32603, message: error.message } })); } } else { console.log(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: {} })); } } catch (error) { console.error('Parse error:', error); } }); process.on('SIGINT', () => process.exit(0)); process.on('SIGTERM', () => process.exit(0));"
                         ]
                     }
                 }
@@ -635,7 +635,7 @@ async function processMcpRequest(method: string, params: any): Promise<any> {
   };
 }
 
-// Helper function to get user's Facebook pages for ad creation
+// Enhanced helper function to get user's Facebook pages using proper Facebook Pages API
 async function getUserFacebookPages(userId: string): Promise<any> {
   try {
     const session = userSessionManager.getSession(userId);
@@ -643,25 +643,75 @@ async function getUserFacebookPages(userId: string): Promise<any> {
       return { success: false, error: 'Invalid session' };
     }
 
-    const response = await fetch(`https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token&access_token=${session.credentials.facebookAccessToken}`);
+    // Use proper Facebook Pages API endpoint from documentation: /me/accounts  
+    // Facebook Pages API v23.0 - returns comprehensive page information
+    const response = await fetch(`https://graph.facebook.com/v23.0/me/accounts?fields=id,name,access_token,category,category_list,tasks,about,website,emails&access_token=${session.credentials.facebookAccessToken}`);
     const pagesData: any = await response.json();
     
     if (pagesData.error) {
       return {
         success: false,
-        error: `Facebook API Error: ${pagesData.error.message}`
+        error: `Facebook Pages API Error (${pagesData.error.code}): ${pagesData.error.message}`,
+        details: 'Ensure your access token has pages_show_list permission'
       };
     }
 
+    // Enhanced page information with full Facebook Pages API data
+    const enhancedPages = (pagesData.data || []).map((page: any) => ({
+      id: page.id,
+      name: page.name,
+      access_token: page.access_token,
+      category: page.category,
+      category_list: page.category_list || [],
+      tasks: page.tasks || [],
+      about: page.about || '',
+      website: page.website || '',
+      emails: page.emails || [],
+      // Computed permissions for easy checking
+      can_create_ads: page.tasks?.includes('ADVERTISE') || false,
+      can_manage: page.tasks?.includes('MANAGE') || false, 
+      can_create_content: page.tasks?.includes('CREATE_CONTENT') || false,
+      can_moderate: page.tasks?.includes('MODERATE') || false,
+      can_analyze: page.tasks?.includes('ANALYZE') || false,
+      // Ad creation readiness
+      ready_for_ads: (page.tasks?.includes('ADVERTISE') && page.tasks?.includes('CREATE_CONTENT')) || false
+    }));
+
     return {
       success: true,
-      pages: pagesData.data || [],
-      message: `Found ${pagesData.data?.length || 0} Facebook page(s)`
+      pages: enhancedPages,
+      totalPages: enhancedPages.length,
+      message: `Found ${enhancedPages.length} Facebook page(s) with detailed permissions`,
+      summary: {
+        total: enhancedPages.length,
+        canAdvertise: enhancedPages.filter((p: any) => p.can_create_ads).length,
+        canManage: enhancedPages.filter((p: any) => p.can_manage).length,
+        canCreateContent: enhancedPages.filter((p: any) => p.can_create_content).length,
+        readyForAds: enhancedPages.filter((p: any) => p.ready_for_ads).length,
+        recommendedPages: enhancedPages.filter((p: any) => p.ready_for_ads).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          category: p.category
+        }))
+      }
     };
-  } catch (error) {
+  } catch (error: any) {
+    let errorMessage = `Error fetching Facebook pages: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    
+    // Add helpful guidance for common Facebook Pages API errors
+    if (error && typeof error === 'object') {
+      if (error.message?.includes('permissions')) {
+        errorMessage += '\n\nSuggestion: Ensure your access token has pages_show_list permission. You may need to re-authenticate with Facebook Login.';
+      }
+      if (error.message?.includes('token')) {
+        errorMessage += '\n\nSuggestion: Your access token may be expired. Please re-authenticate to get a fresh token.';
+      }
+    }
+    
     return {
       success: false,
-      error: `Error fetching pages: ${error instanceof Error ? error.message : 'Unknown error'}`
+      error: errorMessage,
+      tool: 'get_facebook_pages'
     };
   }
 }
@@ -2149,8 +2199,11 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             tool: 'get_facebook_pages',
             result: result.success ? {
               pages: result.pages,
-              totalPages: result.pages?.length || 0,
-              message: result.message
+              totalPages: result.totalPages,
+              summary: result.summary,
+              message: result.message,
+              enhanced: true,
+              apiVersion: 'v23.0'
             } : undefined,
             error: result.success ? undefined : result.error
           };
