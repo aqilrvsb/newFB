@@ -1447,7 +1447,8 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Use Graph API copies endpoint as per Facebook documentation
+          // Alternative approach: Use our proven create_ad_set method
+          // First get the original ad set data via Graph API
           const session = userSessionManager.getSession(userId);
           if (!session) {
             return {
@@ -1457,30 +1458,45 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          const params = new URLSearchParams();
-          params.append('name', newName || `Ad Set Copy - ${Date.now()}`);
-          params.append('deep_copy', 'true');
-          params.append('status_option', 'PAUSED');
-          params.append('access_token', session.credentials.facebookAccessToken);
+          // Get original ad set details using working Graph API approach
+          const response = await fetch(`https://graph.facebook.com/v23.0/${adSetId}?fields=name,campaign_id,daily_budget,targeting,billing_event,optimization_goal&access_token=${session.credentials.facebookAccessToken}`);
+          const originalData: any = await response.json();
 
-          const response = await fetch(`https://graph.facebook.com/v23.0/${adSetId}/copies`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: params.toString()
-          });
-
-          const result: any = await response.json();
-
-          if (result.error) {
+          if (originalData.error) {
             return {
               success: false,
-              error: `Facebook API Error: ${result.error.message}`,
+              error: `Facebook API Error: ${originalData.error.message}`,
               tool: 'duplicate_ad_set',
-              details: result.error
+              details: originalData.error
             };
           }
+
+          // Use our working createAdSet method with original data
+          const params = {
+            name: newName || `${originalData.name} - Copy`,
+            campaign_id: originalData.campaign_id,
+            daily_budget: originalData.daily_budget || 5000, // Default RM50
+            targeting: originalData.targeting || {
+              age_min: 18,
+              age_max: 65,
+              geo_locations: { countries: ['MY'] }
+            },
+            billing_event: originalData.billing_event || 'LINK_CLICKS',
+            optimization_goal: originalData.optimization_goal || 'LINK_CLICKS',
+            status: 'PAUSED' // Always create as paused for safety
+          };
+
+          const adAccount = getAdAccountForUser(userId);
+          if (!adAccount) {
+            return {
+              success: false,
+              error: 'No ad account selected. Use select_ad_account first.',
+              tool: 'duplicate_ad_set'
+            };
+          }
+
+          const fieldsToRead = ['id', 'name', 'status', 'daily_budget', 'campaign_id'];
+          const result = await adAccount.createAdSet(fieldsToRead, params);
 
           return {
             success: true,
@@ -1488,8 +1504,9 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             result: {
               originalAdSetId: adSetId,
               newAdSetId: result.id,
-              newAdSetName: newName,
-              message: 'Ad Set duplicated successfully using Graph API copies endpoint'
+              newAdSetName: result._data?.name,
+              campaignId: result._data?.campaign_id,
+              message: 'Ad Set duplicated successfully'
             }
           };
         } catch (error) {
@@ -1908,7 +1925,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Use Graph API copies endpoint as per Facebook documentation
+          // Use our proven create_ad method with Graph API
           const session = userSessionManager.getSession(userId);
           if (!session) {
             return {
@@ -1918,13 +1935,37 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
+          // Get original ad details using working Graph API approach
+          const response = await fetch(`https://graph.facebook.com/v23.0/${adId}?fields=name,adset_id,creative&access_token=${session.credentials.facebookAccessToken}`);
+          const originalData: any = await response.json();
+
+          if (originalData.error) {
+            return {
+              success: false,
+              error: `Facebook API Error: ${originalData.error.message}`,
+              tool: 'duplicate_ad',
+              details: originalData.error
+            };
+          }
+
+          const adAccount = getAdAccountForUser(userId);
+          if (!adAccount) {
+            return {
+              success: false,
+              error: 'No ad account selected. Use select_ad_account first.',
+              tool: 'duplicate_ad'
+            };
+          }
+
+          // Use our working ad creation method with URL-encoded format
           const params = new URLSearchParams();
-          params.append('name', newName || `Ad Copy - ${Date.now()}`);
-          params.append('deep_copy', 'true');
-          params.append('status_option', 'PAUSED');
+          params.append('name', newName || `${originalData.name} - Copy`);
+          params.append('adset_id', originalData.adset_id);
+          params.append('creative', JSON.stringify({ creative_id: originalData.creative.id }));
+          params.append('status', 'PAUSED');
           params.append('access_token', session.credentials.facebookAccessToken);
 
-          const response = await fetch(`https://graph.facebook.com/v23.0/${adId}/copies`, {
+          const createResponse = await fetch(`https://graph.facebook.com/v23.0/${adAccount.id}/ads`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/x-www-form-urlencoded',
@@ -1932,7 +1973,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             body: params.toString()
           });
 
-          const result: any = await response.json();
+          const result: any = await createResponse.json();
 
           if (result.error) {
             return {
@@ -1949,20 +1990,9 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             result: {
               originalAdId: adId,
               newAdId: result.id,
-              newAdName: newName,
-              message: 'Ad duplicated successfully using Graph API copies endpoint'
-            }
-          };
-
-          return {
-            success: true,
-            tool: 'duplicate_ad',
-            result: {
-              originalAdId: adId,
-              newAdId: result.id,
-              newAdName: result._data?.name,
-              adSetId: result._data?.adset_id,
-              message: 'Ad duplicated successfully'
+              newAdName: newName || `${originalData.name} - Copy`,
+              adSetId: originalData.adset_id,
+              message: 'Ad duplicated successfully using working Graph API method'
             }
           };
         } catch (error) {
