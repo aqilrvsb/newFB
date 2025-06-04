@@ -1787,7 +1787,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
 
           const adSetId = args.adSetId;
           const name = args.name;
-          const creativeId = args.creativeId; // Use creative ID instead of inline creative
+          const creativeId = args.creativeId;
 
           if (!adSetId || !name) {
             return {
@@ -1797,14 +1797,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Dynamic creative handling - proper Facebook API format
-          let finalCreative;
-          if (creativeId) {
-            // Use existing creative by ID with proper format
-            finalCreative = {
-              creative_id: creativeId
-            };
-          } else {
+          if (!creativeId) {
             return {
               success: false,
               error: 'creativeId is required. Use create_ad_creative first, or use get_facebook_pages to get valid page IDs.',
@@ -1813,28 +1806,65 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          const params = {
-            name: name,
-            adset_id: adSetId,
-            creative: finalCreative,
-            status: 'PAUSED',
-            special_ad_categories: [] // Required for compliance
-          };
+          // Alternative approach: Create ad with inline creative specification
+          // First, get the creative details
+          const AdCreative = require('facebook-nodejs-business-sdk').AdCreative;
+          const creative = new AdCreative(creativeId);
+          
+          try {
+            const creativeData = await creative.get(['object_story_spec', 'name']);
+            
+            const params = {
+              name: name,
+              adset_id: adSetId,
+              creative: {
+                creative_id: creativeId
+              },
+              status: 'PAUSED'
+            };
 
-          const fieldsToRead = ['id', 'name', 'status', 'adset_id'];
-          const result = await adAccount.createAd(fieldsToRead, params);
+            const fieldsToRead = ['id', 'name', 'status', 'adset_id'];
+            const result = await adAccount.createAd(fieldsToRead, params);
 
-          return {
-            success: true,
-            tool: 'create_ad',
-            result: {
-              adId: result.id,
-              name: result._data?.name,
-              status: result._data?.status,
-              adSetId: result._data?.adset_id,
-              message: 'Ad created successfully'
-            }
-          };
+            return {
+              success: true,
+              tool: 'create_ad',
+              result: {
+                adId: result.id,
+                name: result._data?.name,
+                status: result._data?.status,
+                adSetId: result._data?.adset_id,
+                creativeId: creativeId,
+                message: 'Ad created successfully with existing creative'
+              }
+            };
+          } catch (creativeError) {
+            // If creative retrieval fails, try direct approach
+            const params = {
+              name: name,
+              adset_id: adSetId,
+              creative: {
+                creative_id: creativeId
+              },
+              status: 'PAUSED'
+            };
+
+            const fieldsToRead = ['id', 'name', 'status', 'adset_id'];
+            const result = await adAccount.createAd(fieldsToRead, params);
+
+            return {
+              success: true,
+              tool: 'create_ad',
+              result: {
+                adId: result.id,
+                name: result._data?.name,
+                status: result._data?.status,
+                adSetId: result._data?.adset_id,
+                creativeId: creativeId,
+                message: 'Ad created successfully'
+              }
+            };
+          }
         } catch (error: any) {
           // Enhanced error handling for Facebook ad creation with detailed debugging
           let errorMessage = `Error creating ad: ${error instanceof Error ? error.message : 'Unknown error'}`;
