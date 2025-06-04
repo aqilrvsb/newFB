@@ -1495,8 +1495,6 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Alternative approach: Use our proven create_ad_set method
-          // First get the original ad set data via Graph API
           const session = userSessionManager.getSession(userId);
           if (!session) {
             return {
@@ -1506,66 +1504,31 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Get original ad set details with more comprehensive fields
-          const response = await fetch(`https://graph.facebook.com/v23.0/${adSetId}?fields=name,campaign_id,daily_budget,lifetime_budget,targeting,billing_event,optimization_goal,status,start_time,end_time&access_token=${session.credentials.facebookAccessToken}`);
-          const originalData: any = await response.json();
+          // Use Facebook /copies endpoint (the correct way)
+          const params = new URLSearchParams();
+          params.append('name', newName || 'Ad Set Copy');
+          params.append('deep_copy', 'true');
+          params.append('status_option', 'PAUSED');
+          params.append('access_token', session.credentials.facebookAccessToken);
 
-          if (originalData.error) {
+          const response = await fetch(`https://graph.facebook.com/v23.0/${adSetId}/copies`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: params.toString()
+          });
+
+          const result: any = await response.json();
+
+          if (result.error) {
             return {
               success: false,
-              error: `Facebook API Error: ${originalData.error.message}`,
+              error: `Facebook API Error: ${result.error.message}`,
               tool: 'duplicate_ad_set',
-              details: originalData.error
+              details: result.error
             };
           }
-
-          // Validate that we have required data
-          if (!originalData.campaign_id || !originalData.targeting) {
-            return {
-              success: false,
-              error: 'Original ad set missing required data (campaign_id or targeting)',
-              tool: 'duplicate_ad_set',
-              debug: originalData
-            };
-          }
-
-          // Use our working createAdSet method with exact original data
-          const params: any = {
-            name: newName || `${originalData.name} - Copy`,
-            campaign_id: originalData.campaign_id,
-            targeting: originalData.targeting, // Use exact original targeting
-            status: 'PAUSED' // Always create as paused for safety
-          };
-
-          // Add budget (prefer daily_budget, fallback to lifetime_budget scaled down)
-          if (originalData.daily_budget) {
-            params.daily_budget = originalData.daily_budget;
-          } else if (originalData.lifetime_budget) {
-            // Convert lifetime to daily (estimate 30 days)
-            params.daily_budget = Math.floor(originalData.lifetime_budget / 30);
-          } else {
-            params.daily_budget = 5000; // Minimum sensible default (RM50)
-          }
-
-          // Add optimization settings if available
-          if (originalData.billing_event) {
-            params.billing_event = originalData.billing_event;
-          }
-          if (originalData.optimization_goal) {
-            params.optimization_goal = originalData.optimization_goal;
-          }
-
-          const adAccount = getAdAccountForUser(userId);
-          if (!adAccount) {
-            return {
-              success: false,
-              error: 'No ad account selected. Use select_ad_account first.',
-              tool: 'duplicate_ad_set'
-            };
-          }
-
-          const fieldsToRead = ['id', 'name', 'status', 'daily_budget', 'campaign_id'];
-          const result = await adAccount.createAdSet(fieldsToRead, params);
 
           return {
             success: true,
@@ -1573,9 +1536,8 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             result: {
               originalAdSetId: adSetId,
               newAdSetId: result.id,
-              newAdSetName: result._data?.name,
-              campaignId: result._data?.campaign_id,
-              message: 'Ad Set duplicated successfully'
+              newAdSetName: newName || 'Ad Set Copy',
+              message: 'Ad Set duplicated successfully using Facebook /copies endpoint'
             }
           };
         } catch (error) {
