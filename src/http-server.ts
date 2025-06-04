@@ -1797,11 +1797,13 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Dynamic creative handling - no hardcoding
+          // Dynamic creative handling - proper Facebook API format
           let finalCreative;
           if (creativeId) {
-            // Use existing creative by ID (recommended approach)
-            finalCreative = creativeId;
+            // Use existing creative by ID with proper format
+            finalCreative = {
+              creative_id: creativeId
+            };
           } else {
             return {
               success: false,
