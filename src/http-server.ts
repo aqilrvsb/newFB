@@ -1151,8 +1151,9 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             targeting: targeting,
             optimization_goal: 'LINK_CLICKS', // For TRAFFIC campaigns
             billing_event: 'LINK_CLICKS', // Must match optimization_goal
-            daily_budget: budget * 100, // Convert to cents
+            bid_amount: 50, // Required for LINK_CLICKS billing event (50 cents = ~RM0.50)
             special_ad_categories: [] // Required by Facebook for compliance
+            // Note: No daily_budget since campaign has budget
           };
 
           const fieldsToRead = ['id', 'name', 'status', 'optimization_goal', 'billing_event', 'daily_budget'];
