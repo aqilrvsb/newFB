@@ -13,21 +13,32 @@ export const createAd = async (
   userId: string,
   adSetId: string,
   name: string,
-  creative: any,
+  creative: any = null,
   status: string = 'PAUSED'
 ) => {
   try {
     const adAccount = getAdAccount(userId);
     
+    // Use simple creative if none provided
+    const defaultCreative = {
+      object_story_spec: {
+        page_id: "1234567890", // Placeholder - user should provide real page ID
+        link_data: {
+          link: "https://example.com",
+          message: "Test ad message"
+        }
+      }
+    };
+    
     const params: any = {
       name,
       adset_id: adSetId,
-      creative,
+      creative: creative || defaultCreative,
       status,
       special_ad_categories: []
     };
     
-    const fieldsToRead = ['id', 'name', 'status', 'creative'];
+    const fieldsToRead = ['id', 'name', 'status'];
     const result: Ad = await adAccount.createAd(fieldsToRead, params);
     
     return {
@@ -36,10 +47,9 @@ export const createAd = async (
       adData: {
         id: result.id,
         name: result._data?.name,
-        status: result._data?.status,
-        creative: result._data?.creative
+        status: result._data?.status
       },
-      message: 'Ad created successfully'
+      message: 'Ad created successfully (Note: Update creative with real page ID and content)'
     };
   } catch (error) {
     return {

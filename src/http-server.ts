@@ -1876,6 +1876,41 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           };
         }
 
+      case 'get_audiences':
+        try {
+          const result = await audienceTools.getCustomAudiences(userId, args.limit || 25);
+          return {
+            success: result.success,
+            tool: 'get_audiences',
+            result: result.success ? result : undefined,
+            error: result.success ? undefined : result.message
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error getting audiences: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'get_audiences'
+          };
+        }
+
+      case 'delete_ad_set':
+        try {
+          const { adSetId } = args;
+          const result = await adSetTools.deleteAdSet(userId, adSetId);
+          return {
+            success: result.success,
+            tool: 'delete_ad_set',
+            result: result.success ? { message: result.message } : undefined,
+            error: result.success ? undefined : result.message
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error deleting ad set: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'delete_ad_set'
+          };
+        }
+
       default:
         return {
           success: false,

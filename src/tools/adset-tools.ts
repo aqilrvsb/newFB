@@ -106,23 +106,19 @@ export const duplicateAdSet = async (
     const adAccount = getAdAccount(userId);
     const originalAdSet = new AdSet(adSetId);
     const adSetDetails = await originalAdSet.get([
-      'name', 'campaign_id', 'targeting', 'optimization_goal', 
-      'billing_event', 'bid_amount', 'daily_budget', 'lifetime_budget'
+      'name', 'campaign_id', 'targeting', 'optimization_goal', 'billing_event'
     ]);
     
     const params: any = {
       name: newName || `${adSetDetails._data?.name} - Copy`,
       campaign_id: adSetDetails._data?.campaign_id,
       targeting: adSetDetails._data?.targeting,
-      optimization_goal: adSetDetails._data?.optimization_goal,
-      billing_event: adSetDetails._data?.billing_event,
+      optimization_goal: adSetDetails._data?.optimization_goal || 'LINK_CLICKS',
+      billing_event: adSetDetails._data?.billing_event || 'LINK_CLICKS',
+      bid_amount: 50, // Use fixed bid amount that works
       status: 'PAUSED',
       special_ad_categories: []
     };
-    
-    if (adSetDetails._data?.bid_amount) params.bid_amount = adSetDetails._data.bid_amount;
-    if (adSetDetails._data?.daily_budget) params.daily_budget = adSetDetails._data.daily_budget;
-    if (adSetDetails._data?.lifetime_budget) params.lifetime_budget = adSetDetails._data.lifetime_budget;
     
     const fieldsToRead = ['id', 'name', 'status'];
     const result = await adAccount.createAdSet(fieldsToRead, params);

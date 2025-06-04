@@ -26,7 +26,9 @@ export const createCustomAudience = async (
     };
     
     if (subtype === 'CUSTOM') {
-      params.customer_file_source = customer_file_source;
+      params.customer_file_source = customer_file_source || 'USER_PROVIDED_ONLY';
+    } else {
+      params.customer_file_source = 'USER_PROVIDED_ONLY'; // Always provide this required parameter
     }
     
     const fieldsToRead = ['id', 'name', 'description', 'subtype', 'approximate_count'];
