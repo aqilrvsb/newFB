@@ -304,7 +304,7 @@ const rateLimitMiddleware = async (req: express.Request, res: express.Response, 
     });
   }
 };
-app.use(rateLimitMiddleware);
+// app.use(rateLimitMiddleware); // Rate limiting disabled
 
 app.get('/health', (req, res) => {
   res.json({

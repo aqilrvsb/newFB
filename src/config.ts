@@ -31,7 +31,7 @@ export const serverConfig: ServerConfig = {
   corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : ['*'],
   rateLimit: {
     windowMs: 15 * 60 * 1000,
-    maxRequests: process.env.RATE_LIMIT_MAX ? parseInt(process.env.RATE_LIMIT_MAX, 10) : 100
+    maxRequests: process.env.RATE_LIMIT_MAX ? parseInt(process.env.RATE_LIMIT_MAX, 10) : 10000
   },
   sessionTimeout: process.env.SESSION_TIMEOUT ? parseInt(process.env.SESSION_TIMEOUT, 10) : 0, // 0 = no timeout
   environment: (process.env.NODE_ENV as 'development' | 'production') || 'development'
