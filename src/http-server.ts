@@ -1816,20 +1816,20 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          const response = await fetch(`https://graph.facebook.com/v18.0/${adAccount.id}/ads`, {
+          // Use URL-encoded format as per Facebook documentation (compatible with -F curl format)
+          const params = new URLSearchParams();
+          params.append('name', name);
+          params.append('adset_id', adSetId);
+          params.append('creative', JSON.stringify({ creative_id: creativeId }));
+          params.append('status', 'PAUSED');
+          params.append('access_token', session.credentials.facebookAccessToken);
+
+          const response = await fetch(`https://graph.facebook.com/v23.0/${adAccount.id}/ads`, {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.credentials.facebookAccessToken}`
+              'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: JSON.stringify({
-              name: name,
-              adset_id: adSetId,
-              creative: {
-                creative_id: creativeId
-              },
-              status: 'PAUSED'
-            })
+            body: params.toString()
           });
 
           const result: any = await response.json();
