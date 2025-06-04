@@ -1458,11 +1458,16 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           const params = {
             name: newName || `${adSetDetails._data?.name} - Copy`,
             campaign_id: adSetDetails._data?.campaign_id,
-            daily_budget: adSetDetails._data?.daily_budget,
-            targeting: adSetDetails._data?.targeting,
-            billing_event: adSetDetails._data?.billing_event,
-            optimization_goal: adSetDetails._data?.optimization_goal,
-            status: 'PAUSED'
+            daily_budget: adSetDetails._data?.daily_budget || 2500, // Default to RM25 if not set
+            targeting: adSetDetails._data?.targeting || {
+              age_min: 18,
+              age_max: 65,
+              geo_locations: { countries: ['MY'] }
+            },
+            billing_event: adSetDetails._data?.billing_event || 'LINK_CLICKS',
+            optimization_goal: adSetDetails._data?.optimization_goal || 'LINK_CLICKS',
+            status: 'PAUSED',
+            special_ad_categories: [] // Required by Facebook
           };
 
           const fieldsToRead = ['id', 'name', 'status', 'daily_budget', 'campaign_id'];
@@ -1772,16 +1777,18 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           // Use creative ID if provided, otherwise create default creative inline
           let finalCreative;
           if (creativeId) {
-            // Use existing creative by ID
-            finalCreative = { creative_id: creativeId };
+            // Use existing creative by ID (recommended approach)
+            finalCreative = creativeId;
           } else {
-            // Fallback to inline creative (Facebook documentation shows this is still supported)
+            // Fallback to inline creative format
             finalCreative = {
               object_story_spec: {
                 page_id: "514433091762412", // A-Smart Wellness page
                 link_data: {
                   link: "https://example.com",
-                  message: "Test ad message - update with real content"
+                  message: "🌿 Smart Wellness - Your Health Journey Starts Here! Click to learn more about our wellness solutions.",
+                  name: "Smart Wellness Solutions",
+                  description: "Premium health and wellness products for Malaysians"
                 }
               }
             };
