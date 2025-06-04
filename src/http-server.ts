@@ -1235,7 +1235,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Ensure minimum required targeting
+          // Ensure minimum required targeting with advantage_audience
           if (!targeting.geo_locations || !targeting.geo_locations.countries || targeting.geo_locations.countries.length === 0) {
             return {
               success: false,
@@ -1248,6 +1248,9 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           // Set default age ranges only if not provided
           if (!targeting.age_min) targeting.age_min = 18;
           if (!targeting.age_max) targeting.age_max = 65;
+          
+          // Add required advantage_audience parameter to targeting
+          targeting.targeting_automation = { advantage_audience: 0 };
           const adAccount = getAdAccountForUser(userId);
           if (!adAccount) {
             return {
@@ -1504,24 +1507,17 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Use Facebook /copies endpoint with proper advantage_audience placement
+          // Use Facebook /copies endpoint with advantage_audience in targeting
           const params = new URLSearchParams();
           params.append('name', newName || 'Ad Set Copy');
           params.append('deep_copy', 'true');
           params.append('status_option', 'PAUSED');
           
-          // Get original ad set to copy its targeting and add advantage_audience properly
-          const originalResponse = await fetch(`https://graph.facebook.com/v23.0/${adSetId}?fields=targeting&access_token=${session.credentials.facebookAccessToken}`);
-          const originalData: any = await originalResponse.json();
-          
-          if (originalData.targeting) {
-            // Add advantage_audience to the existing targeting spec
-            const updatedTargeting = {
-              ...originalData.targeting,
-              targeting_automation: { advantage_audience: 0 }
-            };
-            params.append('targeting', JSON.stringify(updatedTargeting));
-          }
+          // Add targeting with advantage_audience parameter
+          const targetingWithAdvantage = {
+            targeting_automation: { advantage_audience: 0 }
+          };
+          params.append('targeting', JSON.stringify(targetingWithAdvantage));
           
           params.append('access_token', session.credentials.facebookAccessToken);
 
