@@ -1504,11 +1504,30 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Use Facebook /copies endpoint (simple approach)
+          // Get original ad set details first to modify targeting
+          const originalAdSetResponse = await fetch(`https://graph.facebook.com/v23.0/${adSetId}?fields=targeting&access_token=${session.credentials.facebookAccessToken}`, {
+            method: 'GET'
+          });
+          
+          const originalAdSet: any = await originalAdSetResponse.json();
+          
+          // Use Facebook /copies endpoint with advantage_audience fix
           const params = new URLSearchParams();
           params.append('name', newName || 'Ad Set Copy');
           params.append('deep_copy', 'true');
           params.append('status_option', 'PAUSED');
+          
+          // Add targeting with advantage_audience flag if original has targeting
+          if (originalAdSet.targeting) {
+            const modifiedTargeting = {
+              ...originalAdSet.targeting,
+              targeting_automation: {
+                advantage_audience: 0  // Explicitly set to 0 (disabled)
+              }
+            };
+            params.append('targeting', JSON.stringify(modifiedTargeting));
+          }
+          
           params.append('access_token', session.credentials.facebookAccessToken);
 
           const response = await fetch(`https://graph.facebook.com/v23.0/${adSetId}/copies`, {
