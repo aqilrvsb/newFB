@@ -1546,6 +1546,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           const params: any = {
             name: name,
             subtype: type,
+            customer_file_source: 'USER_PROVIDED_ONLY', // Required parameter
             description: description || `Custom audience: ${name}`
           };
 
