@@ -11,6 +11,12 @@ import { serverConfig, userSessionManager, UserCredentials, getAdAccountForUser 
 import { createMcpServer } from './mcp-server.js';
 import path from 'path';
 
+// Import all tools functions
+import * as campaignTools from './tools/campaign-tools.js';
+import * as audienceTools from './tools/audience-tools.js';
+import * as analyticsTools from './tools/analytics-tools.js';
+import * as adSetTools from './tools/adset-tools.js';
+
 const rateLimiter = new RateLimiterMemory({
   points: serverConfig.rateLimit.maxRequests,
   duration: serverConfig.rateLimit.windowMs / 1000,
@@ -1090,15 +1096,6 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
 
       case 'create_ad_set':
         try {
-          const adAccount = getAdAccountForUser(userId);
-          if (!adAccount) {
-            return {
-              success: false,
-              error: 'No ad account selected. Use select_ad_account first.',
-              tool: 'create_ad_set'
-            };
-          }
-
           const campaignId = args.campaignId;
           const name = args.name;
           const targeting = args.targeting;
@@ -1112,45 +1109,45 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          const params: any = {
-            name: name,
-            campaign_id: campaignId,
-            status: 'PAUSED',
-            targeting: targeting,
-            optimization_goal: 'LINK_CLICKS',
-            billing_event: 'IMPRESSIONS',
-            daily_budget: budget * 100 // Convert to cents
-          };
+          // Use the working implementation from tools
+          const result = await adSetTools.createAdSet(
+            userId,
+            campaignId,
+            name,
+            'PAUSED', // status
+            targeting,
+            'LINK_CLICKS', // optimizationGoal for TRAFFIC campaigns
+            'IMPRESSIONS', // billingEvent
+            undefined, // bidAmount
+            budget * 100, // dailyBudget in cents
+            undefined, // lifetimeBudget
+            undefined, // startTime
+            undefined  // endTime
+          );
 
-          const fieldsToRead = ['id', 'name', 'status', 'optimization_goal', 'billing_event', 'daily_budget'];
-          const result = await adAccount.createAdSet(fieldsToRead, params);
-
-          return {
-            success: true,
-            tool: 'create_ad_set',
-            result: {
-              adSetId: result.id,
-              name: result._data?.name,
-              status: result._data?.status,
-              optimizationGoal: result._data?.optimization_goal,
-              billingEvent: result._data?.billing_event,
-              dailyBudget: result._data?.daily_budget ? result._data.daily_budget / 100 : null,
-              campaignId: campaignId,
-              message: 'Ad Set created successfully'
-            }
-          };
+          if (result.success) {
+            return {
+              success: true,
+              tool: 'create_ad_set',
+              result: {
+                adSetId: result.adSetId,
+                adSetData: result.adSetData,
+                message: result.message
+              }
+            };
+          } else {
+            return {
+              success: false,
+              error: result.message,
+              tool: 'create_ad_set'
+            };
+          }
         } catch (error) {
-          console.error('Detailed ad set creation error:', error);
+          console.error('Error in create_ad_set:', error);
           return {
             success: false,
             error: `Error creating ad set: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            tool: 'create_ad_set',
-            debugInfo: {
-              errorType: typeof error,
-              errorName: error instanceof Error ? error.name : 'Unknown',
-              errorCode: error instanceof Error && 'code' in error ? error.code : 'No code',
-              fullError: error instanceof Error ? error.toString() : JSON.stringify(error)
-            }
+            tool: 'create_ad_set'
           };
         }
 
