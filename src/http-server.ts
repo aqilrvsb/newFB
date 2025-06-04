@@ -831,19 +831,17 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
 
       case 'create_campaign':
         try {
-          // Get user's ad accounts first
-          const response = await fetch(`https://graph.facebook.com/v18.0/me/adaccounts?fields=id,name&access_token=${session.credentials.facebookAccessToken}`);
-          const accountsData: any = await response.json();
-          
-          if (accountsData.error || !accountsData.data || accountsData.data.length === 0) {
+          // Use the selected ad account instead of getting all accounts
+          const adAccount = getAdAccountForUser(userId);
+          if (!adAccount) {
             return {
               success: false,
-              error: 'No ad accounts available',
+              error: 'No ad account selected. Use select_ad_account first.',
               tool: 'create_campaign'
             };
           }
 
-          const adAccountId = accountsData.data[0].id;
+          const adAccountId = adAccount.id;
           
           // Create campaign
           const campaignData = {
@@ -1909,6 +1907,60 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             success: false,
             error: `Error deleting ad set: ${error instanceof Error ? error.message : 'Unknown error'}`,
             tool: 'delete_ad_set'
+          };
+        }
+
+      case 'create_lookalike_audience':
+        try {
+          const { name, sourceAudienceId, country, ratio } = args;
+          if (!name || !sourceAudienceId || !country) {
+            return {
+              success: false,
+              error: 'name, sourceAudienceId, and country are required',
+              tool: 'create_lookalike_audience'
+            };
+          }
+          
+          const adAccount = getAdAccountForUser(userId);
+          if (!adAccount) {
+            return {
+              success: false,
+              error: 'No ad account selected. Use select_ad_account first.',
+              tool: 'create_lookalike_audience'
+            };
+          }
+
+          const params = {
+            name: name,
+            description: `Lookalike audience based on ${sourceAudienceId}`,
+            origin_audience_id: sourceAudienceId,
+            subtype: 'LOOKALIKE',
+            lookalike_spec: JSON.stringify({
+              country: country,
+              ratio: ratio || 0.01,
+              type: 'CUSTOM_AUDIENCE'
+            })
+          };
+
+          const fieldsToRead = ['id', 'name', 'description', 'approximate_count'];
+          const result = await adAccount.createCustomAudience(fieldsToRead, params);
+
+          return {
+            success: true,
+            tool: 'create_lookalike_audience',
+            result: {
+              audienceId: result.id,
+              name: result._data?.name,
+              description: result._data?.description,
+              approximateCount: result._data?.approximate_count,
+              message: 'Lookalike audience created successfully'
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error creating lookalike audience: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'create_lookalike_audience'
           };
         }
 
