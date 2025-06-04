@@ -357,20 +357,116 @@ app.get('/stream', (req, res) => {
 
 // Handle POST requests to /stream (n8n MCP Client compatibility)
 app.post('/stream', async (req, res) => {
-  res.json({
-    jsonrpc: '2.0',
-    id: req.body.id || 1,
-    result: {
-      protocolVersion: '2024-11-05',
-      capabilities: {
-        tools: {}
-      },
-      serverInfo: {
-        name: 'facebook-ads-mcp',
-        version: '1.0.0'
-      }
+  try {
+    const { jsonrpc, method, params, id } = req.body;
+
+    // Handle MCP protocol messages
+    switch (method) {
+      case 'initialize':
+        res.json({
+          jsonrpc: '2.0',
+          id: id,
+          result: {
+            protocolVersion: '2024-11-05',
+            capabilities: {
+              tools: {},
+              resources: {},
+              prompts: {}
+            },
+            serverInfo: {
+              name: 'facebook-ads-mcp',
+              version: '1.0.0'
+            }
+          }
+        });
+        break;
+
+      case 'tools/list':
+        res.json({
+          jsonrpc: '2.0',
+          id: id,
+          result: {
+            tools: [
+              { name: 'get_ad_accounts', description: 'Get list of available Facebook ad accounts', inputSchema: { type: 'object', properties: {} } },
+              { name: 'select_ad_account', description: 'Select a specific Facebook ad account to use', inputSchema: { type: 'object', properties: { accountId: { type: 'string' } }, required: ['accountId'] } },
+              { name: 'get_campaigns', description: 'Lists existing campaigns', inputSchema: { type: 'object', properties: { limit: { type: 'number', default: 25 } } } },
+              { name: 'create_campaign', description: 'Creates a new ad campaign', inputSchema: { type: 'object', properties: { name: { type: 'string' }, objective: { type: 'string' }, status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] } }, required: ['name', 'objective'] } },
+              { name: 'update_campaign', description: 'Updates an existing campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, name: { type: 'string' }, status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] }, dailyBudget: { type: 'number' } }, required: ['campaignId'] } },
+              { name: 'duplicate_campaign', description: 'Duplicates an existing campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, newName: { type: 'string' } }, required: ['campaignId'] } },
+              { name: 'delete_campaign', description: 'Deletes a campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' } }, required: ['campaignId'] } },
+              { name: 'get_campaign_details', description: 'Gets details for a specific campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' } }, required: ['campaignId'] } },
+              { name: 'get_campaign_insights', description: 'Retrieves performance insights for a campaign', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, dateRange: { type: 'string', enum: ['today', 'yesterday', 'last_7_days', 'last_30_days'] } }, required: ['campaignId'] } },
+              { name: 'create_ad_set', description: 'Creates a new ad set', inputSchema: { type: 'object', properties: { campaignId: { type: 'string' }, name: { type: 'string' }, targeting: { type: 'object' }, budget: { type: 'number' } }, required: ['campaignId', 'name', 'targeting', 'budget'] } },
+              { name: 'update_ad_set', description: 'Updates an existing ad set', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' }, name: { type: 'string' }, status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] }, dailyBudget: { type: 'number' } }, required: ['adSetId'] } },
+              { name: 'duplicate_ad_set', description: 'Duplicates an existing ad set', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' }, newName: { type: 'string' } }, required: ['adSetId'] } },
+              { name: 'delete_ad_set', description: 'Deletes an ad set', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' } }, required: ['adSetId'] } },
+              { name: 'get_ad_set_insights', description: 'Retrieves performance insights for an ad set', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' }, dateRange: { type: 'string', enum: ['today', 'yesterday', 'last_7_days', 'last_30_days'] } }, required: ['adSetId'] } },
+              { name: 'create_ad_creative', description: 'Creates a new ad creative', inputSchema: { type: 'object', properties: { name: { type: 'string' }, pageId: { type: 'string' }, link: { type: 'string' }, message: { type: 'string' }, description: { type: 'string' } }, required: ['name', 'pageId', 'link', 'message'] } },
+              { name: 'create_ad', description: 'Creates a new ad', inputSchema: { type: 'object', properties: { adSetId: { type: 'string' }, name: { type: 'string' }, creativeId: { type: 'string' } }, required: ['adSetId', 'name', 'creativeId'] } },
+              { name: 'update_ad', description: 'Updates an existing ad', inputSchema: { type: 'object', properties: { adId: { type: 'string' }, name: { type: 'string' }, status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] } }, required: ['adId'] } },
+              { name: 'duplicate_ad', description: 'Duplicates an existing ad', inputSchema: { type: 'object', properties: { adId: { type: 'string' }, newName: { type: 'string' } }, required: ['adId'] } },
+              { name: 'delete_ad', description: 'Deletes an ad', inputSchema: { type: 'object', properties: { adId: { type: 'string' } }, required: ['adId'] } },
+              { name: 'get_ad_insights', description: 'Retrieves performance insights for an ad', inputSchema: { type: 'object', properties: { adId: { type: 'string' }, dateRange: { type: 'string', enum: ['today', 'yesterday', 'last_7_days', 'last_30_days'] } }, required: ['adId'] } },
+              { name: 'get_audiences', description: 'Lists available custom audiences', inputSchema: { type: 'object', properties: { limit: { type: 'number', default: 25 } } } },
+              { name: 'create_custom_audience', description: 'Creates a custom audience', inputSchema: { type: 'object', properties: { name: { type: 'string' }, type: { type: 'string', enum: ['CUSTOM', 'WEBSITE', 'ENGAGEMENT'] }, description: { type: 'string' } }, required: ['name', 'type'] } },
+              { name: 'get_facebook_pages', description: 'Get Facebook pages with permissions', inputSchema: { type: 'object', properties: {} } },
+              { name: 'generate_campaign_prompt', description: 'Generates campaign creation prompts', inputSchema: { type: 'object', properties: { objective: { type: 'string' }, industry: { type: 'string' }, target_audience: { type: 'string' } }, required: ['objective'] } }
+            ]
+          }
+        });
+        break;
+
+      case 'tools/call':
+        // Route tool calls to the main MCP endpoint with session from params
+        const toolName = params.name;
+        const toolArgs = params.arguments || {};
+        
+        // Extract userId from the request (you'll need to pass this)
+        const userId = (req.headers['x-user-id'] as string) || '2df9ff22-bc93-4e2b-bb37-c489543a9659'; // Use current session as fallback
+        
+        try {
+          const result = await processMcpToolCall(toolName, toolArgs, userId);
+          res.json({
+            jsonrpc: '2.0',
+            id: id,
+            result: {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result, null, 2)
+                }
+              ]
+            }
+          });
+        } catch (error) {
+          res.json({
+            jsonrpc: '2.0',
+            id: id,
+            error: {
+              code: -32603,
+              message: error instanceof Error ? error.message : 'Unknown error'
+            }
+          });
+        }
+        break;
+
+      default:
+        res.json({
+          jsonrpc: '2.0',
+          id: id,
+          result: {}
+        });
     }
-  });
+  } catch (error) {
+    res.status(500).json({
+      jsonrpc: '2.0',
+      id: req.body?.id || null,
+      error: {
+        code: -32603,
+        message: 'Internal error'
+      }
+    });
+  }
 });
 
 app.post('/auth', async (req, res) => {
