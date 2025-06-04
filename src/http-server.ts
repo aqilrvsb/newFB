@@ -1163,7 +1163,21 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Get the selected ad account for this user
+          // Validate and enhance targeting
+          if (!targeting || typeof targeting !== 'object') {
+            return {
+              success: false,
+              error: 'Invalid targeting format. Use: {"geo_locations": {"countries": ["MY"]}, "age_min": 18, "age_max": 65}',
+              tool: 'create_ad_set'
+            };
+          }
+
+          // Ensure basic targeting requirements
+          if (!targeting.geo_locations || !targeting.geo_locations.countries) {
+            targeting.geo_locations = { countries: ['MY'] }; // Default to Malaysia
+          }
+          if (!targeting.age_min) targeting.age_min = 18;
+          if (!targeting.age_max) targeting.age_max = 65;
           const adAccount = getAdAccountForUser(userId);
           if (!adAccount) {
             return {
@@ -1173,7 +1187,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Use the EXACT working implementation from MCP-Facebook-main
+          // Enhanced ad set creation with proper targeting and budget
           const params: any = {
             campaign_id: campaignId,
             name: name,
@@ -1181,9 +1195,9 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             targeting: targeting,
             optimization_goal: 'LINK_CLICKS', // For TRAFFIC campaigns
             billing_event: 'LINK_CLICKS', // Must match optimization_goal
-            bid_amount: 50, // Required for LINK_CLICKS billing event (50 cents = ~RM0.50)
+            bid_amount: 50, // Required for LINK_CLICKS billing event (50 cents)
+            daily_budget: budget * 100, // Convert to cents (Facebook requires cents)
             special_ad_categories: [] // Required by Facebook for compliance
-            // Note: No daily_budget since campaign has budget
           };
 
           const fieldsToRead = ['id', 'name', 'status', 'optimization_goal', 'billing_event', 'daily_budget'];
@@ -1593,10 +1607,25 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
               message: 'Custom audience created successfully'
             }
           };
-        } catch (error) {
+        } catch (error: any) {
+          // Enhanced error handling for custom audience permissions
+          let errorMessage = `Error creating custom audience: ${error instanceof Error ? error.message : 'Unknown error'}`;
+          
+          if (error && typeof error === 'object' && 'response' in error) {
+            const fbError = error.response?.data?.error;
+            if (fbError) {
+              errorMessage = `Facebook API Error (${fbError.code}): ${fbError.message}`;
+              
+              // Add helpful suggestions for common permission errors
+              if (fbError.message.includes('permission') || fbError.message.includes('Permission')) {
+                errorMessage += '\n\nSuggestion: Custom audience creation requires specific Facebook permissions. This may require business verification or additional app permissions.';
+              }
+            }
+          }
+          
           return {
             success: false,
-            error: `Error creating custom audience: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            error: errorMessage,
             tool: 'create_custom_audience'
           };
         }
@@ -2053,6 +2082,77 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             success: false,
             error: `Error getting Facebook pages: ${error instanceof Error ? error.message : 'Unknown error'}`,
             tool: 'get_facebook_pages'
+          };
+        }
+
+      case 'generate_campaign_prompt':
+        try {
+          const objective = args.objective;
+          const industry = args.industry || 'General';
+          const target_audience = args.target_audience || 'General audience';
+
+          if (!objective) {
+            return {
+              success: false,
+              error: 'Objective is required',
+              tool: 'generate_campaign_prompt'
+            };
+          }
+
+          // Generate AI-powered campaign prompt based on inputs
+          const prompt = `Create a Facebook ad campaign with the following specifications:
+
+**Campaign Objective**: ${objective}
+**Industry**: ${industry}
+**Target Audience**: ${target_audience}
+
+**Suggested Campaign Structure:**
+
+1. **Campaign Name**: [Industry] - [Objective] - [Date]
+2. **Campaign Settings**:
+   - Objective: ${objective}
+   - Budget: Daily budget recommended
+   - Schedule: Start immediately, end date optional
+
+3. **Ad Set Targeting**:
+   - Location: Based on business location
+   - Age: 18-65 (adjust based on product/service)
+   - Interests: Related to ${industry}
+   - Custom Audiences: Consider creating lookalike audiences
+
+4. **Ad Creative Recommendations**:
+   - Use high-quality images/videos related to ${industry}
+   - Clear call-to-action
+   - Compelling headline
+   - Value proposition
+
+5. **Budget Recommendations**:
+   - Start with $10-50 daily budget for testing
+   - Scale up based on performance
+   - Monitor CPC, CTR, and conversion rates
+
+**Next Steps**:
+1. Use create_campaign tool with objective: ${objective}
+2. Create ad sets with proper targeting
+3. Design compelling ad creatives
+4. Monitor and optimize performance`;
+
+          return {
+            success: true,
+            tool: 'generate_campaign_prompt',
+            result: {
+              objective: objective,
+              industry: industry,
+              targetAudience: target_audience,
+              generatedPrompt: prompt,
+              message: 'Campaign prompt generated successfully'
+            }
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error generating campaign prompt: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'generate_campaign_prompt'
           };
         }
 
