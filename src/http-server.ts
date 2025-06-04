@@ -1447,38 +1447,40 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          const AdSet = require('facebook-nodejs-business-sdk').AdSet;
-          const originalAdSet = new AdSet(adSetId);
-          
-          const fields = ['name', 'campaign_id', 'daily_budget', 'targeting', 'billing_event', 'optimization_goal'];
-          const adSetDetails = await originalAdSet.get(fields);
-
-          const adAccount = getAdAccountForUser(userId);
-          if (!adAccount) {
+          // Use Graph API copies endpoint as per Facebook documentation
+          const session = userSessionManager.getSession(userId);
+          if (!session) {
             return {
               success: false,
-              error: 'No ad account selected. Use select_ad_account first.',
+              error: 'User session not found or expired',
               tool: 'duplicate_ad_set'
             };
           }
 
-          const params = {
-            name: newName || `${adSetDetails._data?.name} - Copy`,
-            campaign_id: adSetDetails._data?.campaign_id,
-            daily_budget: adSetDetails._data?.daily_budget || 2500, // Default to RM25 if not set
-            targeting: adSetDetails._data?.targeting || {
-              age_min: 18,
-              age_max: 65,
-              geo_locations: { countries: ['MY'] }
-            },
-            billing_event: adSetDetails._data?.billing_event || 'LINK_CLICKS',
-            optimization_goal: adSetDetails._data?.optimization_goal || 'LINK_CLICKS',
-            status: 'PAUSED',
-            special_ad_categories: [] // Required by Facebook
-          };
+          const params = new URLSearchParams();
+          params.append('name', newName || `Ad Set Copy - ${Date.now()}`);
+          params.append('deep_copy', 'true');
+          params.append('status_option', 'PAUSED');
+          params.append('access_token', session.credentials.facebookAccessToken);
 
-          const fieldsToRead = ['id', 'name', 'status', 'daily_budget', 'campaign_id'];
-          const result = await adAccount.createAdSet(fieldsToRead, params);
+          const response = await fetch(`https://graph.facebook.com/v23.0/${adSetId}/copies`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: params.toString()
+          });
+
+          const result: any = await response.json();
+
+          if (result.error) {
+            return {
+              success: false,
+              error: `Facebook API Error: ${result.error.message}`,
+              tool: 'duplicate_ad_set',
+              details: result.error
+            };
+          }
 
           return {
             success: true,
@@ -1486,9 +1488,8 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             result: {
               originalAdSetId: adSetId,
               newAdSetId: result.id,
-              newAdSetName: result._data?.name,
-              campaignId: result._data?.campaign_id,
-              message: 'Ad Set duplicated successfully'
+              newAdSetName: newName,
+              message: 'Ad Set duplicated successfully using Graph API copies endpoint'
             }
           };
         } catch (error) {
@@ -1907,31 +1908,51 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          const Ad = require('facebook-nodejs-business-sdk').Ad;
-          const originalAd = new Ad(adId);
-          
-          const fields = ['name', 'adset_id', 'creative'];
-          const adDetails = await originalAd.get(fields);
-
-          const adAccount = getAdAccountForUser(userId);
-          if (!adAccount) {
+          // Use Graph API copies endpoint as per Facebook documentation
+          const session = userSessionManager.getSession(userId);
+          if (!session) {
             return {
               success: false,
-              error: 'No ad account selected. Use select_ad_account first.',
+              error: 'User session not found or expired',
               tool: 'duplicate_ad'
             };
           }
 
-          const params = {
-            name: newName || `${adDetails._data?.name} - Copy`,
-            adset_id: adDetails._data?.adset_id,
-            creative: adDetails._data?.creative,
-            status: 'PAUSED',
-            special_ad_categories: [] // Required for compliance
-          };
+          const params = new URLSearchParams();
+          params.append('name', newName || `Ad Copy - ${Date.now()}`);
+          params.append('deep_copy', 'true');
+          params.append('status_option', 'PAUSED');
+          params.append('access_token', session.credentials.facebookAccessToken);
 
-          const fieldsToRead = ['id', 'name', 'status', 'adset_id'];
-          const result = await adAccount.createAd(fieldsToRead, params);
+          const response = await fetch(`https://graph.facebook.com/v23.0/${adId}/copies`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: params.toString()
+          });
+
+          const result: any = await response.json();
+
+          if (result.error) {
+            return {
+              success: false,
+              error: `Facebook API Error: ${result.error.message}`,
+              tool: 'duplicate_ad',
+              details: result.error
+            };
+          }
+
+          return {
+            success: true,
+            tool: 'duplicate_ad',
+            result: {
+              originalAdId: adId,
+              newAdId: result.id,
+              newAdName: newName,
+              message: 'Ad duplicated successfully using Graph API copies endpoint'
+            }
+          };
 
           return {
             success: true,
