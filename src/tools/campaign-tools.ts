@@ -206,3 +206,73 @@ export const deleteCampaign = async (userId: string, campaignId: string) => {
     };
   }
 };
+// Duplicate Campaign
+export const duplicateCampaign = async (
+  userId: string,
+  campaignId: string,
+  newName?: string
+) => {
+  try {
+    const adAccount = getAdAccountForUser(userId);
+    const originalCampaign = new Campaign(campaignId);
+    const campaignDetails = await originalCampaign.get([
+      'name', 'objective', 'status', 'daily_budget', 'lifetime_budget', 
+      'buying_type', 'special_ad_categories'
+    ]);
+    
+    const params: any = {
+      name: newName || `${campaignDetails._data?.name} - Copy`,
+      objective: campaignDetails._data?.objective,
+      status: 'PAUSED',
+      special_ad_categories: campaignDetails._data?.special_ad_categories || []
+    };
+    
+    if (campaignDetails._data?.daily_budget) {
+      params.daily_budget = campaignDetails._data.daily_budget;
+    }
+    if (campaignDetails._data?.lifetime_budget) {
+      params.lifetime_budget = campaignDetails._data.lifetime_budget;
+    }
+    if (campaignDetails._data?.buying_type) {
+      params.buying_type = campaignDetails._data.buying_type;
+    }
+    
+    const fieldsToRead = ['id', 'name', 'objective', 'status', 'created_time'];
+    const result = await adAccount.createCampaign(fieldsToRead, params);
+    
+    return {
+      success: true,
+      campaignId: result.id,
+      campaignData: {
+        id: result.id,
+        name: result._data?.name,
+        objective: result._data?.objective,
+        status: result._data?.status,
+        createdTime: result._data?.created_time
+      },
+      message: 'Campaign duplicated successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error duplicating campaign: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Delete Campaign
+export const deleteCampaign = async (userId: string, campaignId: string) => {
+  try {
+    const campaign = new Campaign(campaignId);
+    await campaign.delete([]);
+    return {
+      success: true,
+      message: 'Campaign deleted successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error deleting campaign: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};

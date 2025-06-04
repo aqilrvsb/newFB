@@ -16,6 +16,7 @@ import * as campaignTools from './tools/campaign-tools.js';
 import * as audienceTools from './tools/audience-tools.js';
 import * as analyticsTools from './tools/analytics-tools.js';
 import * as adSetTools from './tools/adset-tools.js';
+import * as adTools from './tools/ad-tools.js';
 
 const rateLimiter = new RateLimiterMemory({
   points: serverConfig.rateLimit.maxRequests,
@@ -1836,6 +1837,42 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             success: false,
             error: `Error getting ad insights: ${error instanceof Error ? error.message : 'Unknown error'}`,
             tool: 'get_ad_insights'
+          };
+        }
+
+      case 'duplicate_campaign':
+        try {
+          const { campaignId, newName } = args;
+          const result = await campaignTools.duplicateCampaign(userId, campaignId, newName);
+          return {
+            success: result.success,
+            tool: 'duplicate_campaign',
+            result: result.success ? result : undefined,
+            error: result.success ? undefined : result.message
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error duplicating campaign: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'duplicate_campaign'
+          };
+        }
+
+      case 'delete_campaign':
+        try {
+          const { campaignId } = args;
+          const result = await campaignTools.deleteCampaign(userId, campaignId);
+          return {
+            success: result.success,
+            tool: 'delete_campaign',
+            result: result.success ? { message: result.message } : undefined,
+            error: result.success ? undefined : result.message
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error deleting campaign: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: 'delete_campaign'
           };
         }
 

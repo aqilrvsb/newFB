@@ -1,0 +1,227 @@
+import { Ad } from 'facebook-nodejs-business-sdk';
+import { getAdAccountForUser } from '../config.js';
+
+const getAdAccount = (userId: string) => {
+  const adAccount = getAdAccountForUser(userId);
+  if (!adAccount) {
+    throw new Error('User session not found or expired');
+  }
+  return adAccount;
+};
+
+export const createAd = async (
+  userId: string,
+  adSetId: string,
+  name: string,
+  creative: any,
+  status: string = 'PAUSED'
+) => {
+  try {
+    const adAccount = getAdAccount(userId);
+    
+    const params: any = {
+      name,
+      adset_id: adSetId,
+      creative,
+      status,
+      special_ad_categories: []
+    };
+    
+    const fieldsToRead = ['id', 'name', 'status', 'creative'];
+    const result: Ad = await adAccount.createAd(fieldsToRead, params);
+    
+    return {
+      success: true,
+      adId: result.id,
+      adData: {
+        id: result.id,
+        name: result._data?.name,
+        status: result._data?.status,
+        creative: result._data?.creative
+      },
+      message: 'Ad created successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error creating ad: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+ fieldsToRead = ['id', 'name', 'status', 'creative'];
+    const result: Ad = await adAccount.createAd(fieldsToRead, params);
+    
+    return {
+      success: true,
+      adId: result.id,
+      adData: {
+        id: result.id,
+        name: result._data?.name,
+        status: result._data?.status,
+        creative: result._data?.creative
+      },
+      message: 'Ad created successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error creating ad: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Update Ad
+export const updateAd = async (
+  userId: string,
+  adId: string,
+  name?: string,
+  status?: string,
+  creative?: any
+) => {
+  try {
+    const ad = new Ad(adId);
+    const params: any = {};
+    if (name) params.name = name;
+    if (status) params.status = status;
+    if (creative) params.creative = creative;
+    
+    await ad.update(params);
+    return {
+      success: true,
+      message: 'Ad updated successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error updating ad: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Duplicate Ad
+export const duplicateAd = async (
+  userId: string,
+  adId: string,
+  newName?: string
+) => {
+  try {
+    const adAccount = getAdAccount(userId);
+    const originalAd = new Ad(adId);
+    const adDetails = await originalAd.get(['name', 'adset_id', 'creative', 'status']);
+    
+    const params = {
+      name: newName || `${adDetails._data?.name} - Copy`,
+      adset_id: adDetails._data?.adset_id,
+      creative: adDetails._data?.creative,
+      status: 'PAUSED',
+      special_ad_categories: []
+    };
+    
+    const fieldsToRead = ['id', 'name', 'status'];
+    const result = await adAccount.createAd(fieldsToRead, params);
+    
+    return {
+      success: true,
+      adId: result.id,
+      adData: {
+        id: result.id,
+        name: result._data?.name,
+        status: result._data?.status
+      },
+      message: 'Ad duplicated successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error duplicating ad: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Delete Ad
+export const deleteAd = async (userId: string, adId: string) => {
+  try {
+    const ad = new Ad(adId);
+    await ad.delete([]);
+    return {
+      success: true,
+      message: 'Ad deleted successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error deleting ad: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Get Ad Insights
+export const getAdInsights = async (
+  userId: string,
+  adId: string,
+  dateRange: string = 'last_7_days'
+) => {
+  try {
+    const ad = new Ad(adId);
+    const timeRange = getTimeRangeFromString(dateRange);
+    const params = { time_range: timeRange, level: 'ad' };
+    const metrics = ['impressions', 'clicks', 'spend', 'cpc', 'ctr', 'reach'];
+    const insights = await ad.getInsights(metrics, params);
+    
+    if (!insights || insights.length === 0) {
+      return {
+        success: true,
+        insights: null,
+        message: 'No insights data available for the specified date range'
+      };
+    }
+    
+    const formattedInsights = insights.map((insight: any) => ({
+      date_start: insight.date_start,
+      date_stop: insight.date_stop,
+      impressions: parseInt(insight.impressions || '0'),
+      clicks: parseInt(insight.clicks || '0'),
+      spend: parseFloat(insight.spend || '0'),
+      cpc: parseFloat(insight.cpc || '0'),
+      ctr: parseFloat(insight.ctr || '0'),
+      reach: parseInt(insight.reach || '0')
+    }));
+    
+    return {
+      success: true,
+      insights: formattedInsights,
+      message: 'Ad insights retrieved successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting ad insights: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+function getTimeRangeFromString(dateRange: string) {
+  const today = new Date();
+  const endDate = today.toISOString().split('T')[0];
+  let startDate: string;
+  
+  switch (dateRange) {
+    case 'today': startDate = endDate; break;
+    case 'yesterday':
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      startDate = yesterday.toISOString().split('T')[0];
+      break;
+    case 'last_30_days':
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(today.getDate() - 30);
+      startDate = thirtyDaysAgo.toISOString().split('T')[0];
+      break;
+    default:
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(today.getDate() - 7);
+      startDate = sevenDaysAgo.toISOString().split('T')[0];
+  }
+  
+  return { since: startDate, until: endDate };
+}
