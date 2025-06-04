@@ -103,35 +103,46 @@ export const duplicateAdSet = async (
   newName?: string
 ) => {
   try {
-    const originalAdSet = new AdSet(adSetId);
+    const { userSessionManager } = await import('../config.js');
+    const session = userSessionManager.getSession(userId);
     
-    // Get original ad set details for copying
-    const adSetDetails = await originalAdSet.get([
-      'name', 'campaign_id', 'targeting', 'optimization_goal', 'billing_event', 'daily_budget'
-    ]);
+    if (!session) {
+      throw new Error('User session not found or expired');
+    }
     
-    const copyName = newName || `${adSetDetails._data?.name} - Copy`;
+    const accessToken = session.credentials.facebookAccessToken;
     
-    // Prepare the copies endpoint parameters
-    const params: any = {
-      name: copyName,
-      deep_copy: false,
-      status_option: 'PAUSED'
-    };
+    // Get original ad set details
+    const originalAdSetResponse = await fetch(
+      `https://graph.facebook.com/v23.0/${adSetId}?fields=name,targeting&access_token=${accessToken}`
+    );
     
-    // Add the targeting with advantage_audience flag properly set
-    if (adSetDetails._data?.targeting) {
-      params.targeting = {
-        ...adSetDetails._data.targeting,
+    if (!originalAdSetResponse.ok) {
+      throw new Error('Failed to fetch original ad set details');
+    }
+    
+    const originalAdSet: any = await originalAdSetResponse.json();
+    
+    // Use Facebook /copies endpoint with advantage_audience fix using form data
+    const params = new URLSearchParams();
+    params.append('name', newName || `${originalAdSet.name} - Copy`);
+    params.append('deep_copy', 'false');
+    params.append('status_option', 'PAUSED');
+    
+    // Add targeting with advantage_audience flag if original has targeting
+    if (originalAdSet.targeting) {
+      const modifiedTargeting = {
+        ...originalAdSet.targeting,
         targeting_automation: {
-          advantage_audience: 0  // Explicitly disable advantage audience
+          advantage_audience: 0  // Explicitly set to 0 (disabled)
         }
       };
+      params.append('targeting', JSON.stringify(modifiedTargeting));
     } else {
-      // If no targeting exists, create minimal targeting with advantage_audience
-      params.targeting = {
+      // Create minimal targeting with advantage_audience
+      const defaultTargeting = {
         geo_locations: {
-          countries: ['MY']  // Default to Malaysia
+          countries: ['MY']
         },
         age_min: 18,
         age_max: 65,
@@ -139,23 +150,31 @@ export const duplicateAdSet = async (
           advantage_audience: 0
         }
       };
+      params.append('targeting', JSON.stringify(defaultTargeting));
     }
     
-    // Use the Facebook Graph API directly for copies endpoint
-    const { FacebookApi } = require('facebook-nodejs-business-sdk');
-    const api = FacebookApi.init();
-    
-    const copyResult = await api.call(
-      'POST',
-      `/${adSetId}/copies`,
-      params
-    );
+    params.append('access_token', accessToken);
+
+    const response = await fetch(`https://graph.facebook.com/v23.0/${adSetId}/copies`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString()
+    });
+
+    if (!response.ok) {
+      const errorData: any = await response.json();
+      throw new Error(`Facebook API Error: ${errorData.error?.message || 'Unknown error'}`);
+    }
+
+    const result: any = await response.json();
     
     return {
       success: true,
-      adSetId: copyResult.copied_adset_id,
+      adSetId: result.copied_adset_id,
       originalAdSetId: adSetId,
-      newAdSetName: copyName,
+      newAdSetName: newName || `${originalAdSet.name} - Copy`,
       message: "Ad Set duplicated successfully using Facebook /copies endpoint"
     };
   } catch (error: any) {
