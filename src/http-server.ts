@@ -1228,7 +1228,8 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             return {
               success: false,
               error: 'geo_locations.countries is required in targeting. Specify country codes like ["MY"], ["US"], ["SG"]',
-              tool: 'create_ad_set'
+              tool: 'create_ad_set',
+              suggestion: 'Example: {"geo_locations": {"countries": ["MY"]}, "age_min": 25, "age_max": 55}'
             };
           }
           
@@ -1250,9 +1251,9 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             name: name,
             status: 'PAUSED', // Start paused for safety
             targeting: targeting,
-            optimization_goal: 'REACH', // Facebook default for most campaigns
-            billing_event: 'IMPRESSIONS', // Facebook default billing
-            daily_budget: budget * 100, // Convert to cents (Facebook requires cents)
+            optimization_goal: 'LINK_CLICKS', // Better default for traffic campaigns
+            billing_event: 'LINK_CLICKS', // Better default billing event
+            daily_budget: Math.max(budget * 100, 500), // Convert to cents, minimum RM5
             special_ad_categories: [] // Required by Facebook for compliance
           };
 
