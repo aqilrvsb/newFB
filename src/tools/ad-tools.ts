@@ -48,29 +48,7 @@ export const createAd = async (
     };
   }
 };
- fieldsToRead = ['id', 'name', 'status', 'creative'];
-    const result: Ad = await adAccount.createAd(fieldsToRead, params);
-    
-    return {
-      success: true,
-      adId: result.id,
-      adData: {
-        id: result.id,
-        name: result._data?.name,
-        status: result._data?.status,
-        creative: result._data?.creative
-      },
-      message: 'Ad created successfully'
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `Error creating ad: ${error instanceof Error ? error.message : 'Unknown error'}`
-    };
-  }
-};
 
-// Update Ad
 export const updateAd = async (
   userId: string,
   adId: string,
@@ -98,7 +76,6 @@ export const updateAd = async (
   }
 };
 
-// Duplicate Ad
 export const duplicateAd = async (
   userId: string,
   adId: string,
@@ -138,7 +115,6 @@ export const duplicateAd = async (
   }
 };
 
-// Delete Ad
 export const deleteAd = async (userId: string, adId: string) => {
   try {
     const ad = new Ad(adId);
@@ -155,7 +131,6 @@ export const deleteAd = async (userId: string, adId: string) => {
   }
 };
 
-// Get Ad Insights
 export const getAdInsights = async (
   userId: string,
   adId: string,
