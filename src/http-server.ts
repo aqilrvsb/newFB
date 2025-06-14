@@ -144,7 +144,7 @@ app.get('/get-user-id', (req, res) => {
                     <li><strong>Replace the entire file contents</strong> with the configuration above</li>
                     <li><strong>Save the file</strong></li>
                     <li><strong>Restart Claude Desktop</strong></li>
-                    <li><strong>Test Facebook Ads tools</strong> - you now have 11 tools available!</li>
+                    <li><strong>Test Facebook Ads tools</strong> - you now have 45 tools available!</li>
                 </ol>
             </div>
         </div>
