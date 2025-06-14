@@ -17,7 +17,7 @@ export const getOptimizationGoalForObjective = (objective: string): { optimizati
       return { optimizationGoal: 'APP_INSTALLS', billingEvent: 'IMPRESSIONS' };
     
     case 'OUTCOME_SALES':
-      return { optimizationGoal: 'CONVERSIONS', billingEvent: 'IMPRESSIONS' };
+      return { optimizationGoal: 'OFFSITE_CONVERSIONS', billingEvent: 'IMPRESSIONS' };
     
     default:
       // Default to engagement if unknown objective
