@@ -10,6 +10,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { serverConfig, userSessionManager, UserCredentials, getAdAccountForUser } from './config.js';
 import { createMcpServer } from './mcp-server.js';
 import path from 'path';
+import { getOptimizationGoalForObjective, VALID_CAMPAIGN_OBJECTIVES } from './utils/campaign-helpers.js';
 
 // Import all tools functions
 import * as campaignTools from './tools/campaign-tools.js';
@@ -1080,6 +1081,14 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
 
       case 'create_campaign':
         try {
+          // Validate objective
+          if (!VALID_CAMPAIGN_OBJECTIVES.includes(args.objective)) {
+            return {
+              success: false,
+              error: `Invalid objective. Valid options are: ${VALID_CAMPAIGN_OBJECTIVES.join(', ')}`,
+              tool: 'create_campaign'
+            };
+          }
           // Use the selected ad account instead of getting all accounts
           const adAccount = getAdAccountForUser(userId);
           if (!adAccount) {
@@ -1437,21 +1446,8 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             };
           }
 
-          // Set optimization goal and billing event based on campaign objective
-          let optimizationGoal = 'POST_ENGAGEMENT';
-          let billingEvent = 'IMPRESSIONS';
-          
-          const objective = campaignData.objective;
-          if (objective === 'OUTCOME_TRAFFIC') {
-            optimizationGoal = 'LINK_CLICKS';
-            billingEvent = 'LINK_CLICKS';
-          } else if (objective === 'OUTCOME_ENGAGEMENT') {
-            optimizationGoal = 'POST_ENGAGEMENT';
-            billingEvent = 'IMPRESSIONS';
-          } else if (objective === 'OUTCOME_LEADS') {
-            optimizationGoal = 'LEAD_GENERATION';
-            billingEvent = 'IMPRESSIONS';
-          }
+          // Use helper function to get optimization goal and billing event
+          const { optimizationGoal, billingEvent } = getOptimizationGoalForObjective(campaignData.objective);
 
           // Fixed ad set creation with all required Facebook API v23 parameters
           const params: any = {
@@ -1485,13 +1481,13 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
               adSetId: adSetData.id,
               adSetData: {
                 ...adSetData,
-                campaignObjective: objective,
+                campaignObjective: campaignData.objective,
                 optimizationGoal: optimizationGoal,
                 billingEvent: billingEvent,
                 budgetMYR: budget,
                 budgetCents: params.daily_budget
               },
-              message: `Ad Set created successfully for ${objective} campaign with ${optimizationGoal} optimization`
+              message: `Ad Set created successfully for ${campaignData.objective} campaign with ${optimizationGoal} optimization`
             }
           };
         } catch (error: any) {

@@ -99,8 +99,8 @@ This is a **complete, production-ready solution** that provides full Facebook Ad
 
 ### **Session Management**
 - Each user session isolated with their own Facebook SDK instance
-- Sessions auto-expire after 1 hour of inactivity  
-- Automatic cleanup every 10 minutes
+- Sessions persist indefinitely (no expiration)  
+- Automatic cleanup disabled by default (SESSION_TIMEOUT=0)
 - Maximum 200 concurrent sessions
 - Dynamic session ID generation for each restart
 
