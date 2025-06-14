@@ -1,0 +1,15 @@
+{
+  "version": "2.0.2",
+  "timestamp": "2025-06-14T14:16:55.950Z",
+  "tools": {
+    "campaign": 7,
+    "account": 2,
+    "adSet": 5,
+    "ad": 6,
+    "audience": 5,
+    "adsLibrary": 4,
+    "pageManagement": 17,
+    "other": 1,
+    "total": 46
+  }
+}

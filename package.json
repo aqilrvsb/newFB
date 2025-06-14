@@ -1,6 +1,6 @@
 {
   "name": "dynamic-facebook-ads-mcp-server",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Dynamic Multi-User MCP server for Facebook Ads with HTTP transport support",
   "main": "dist/index.js",
   "scripts": {
@@ -55,5 +55,7 @@
     "node": ">=18.0.0"
   },
   "deploymentTimestamp": "2025-06-14T14:12:21.469Z",
-  "toolsCount": 46
+  "toolsCount": 46,
+  "buildTime": "2025-06-14T14:16:55.942Z",
+  "includesPageManagement": true
 }
