@@ -18,6 +18,8 @@ import * as audienceTools from './tools/audience-tools.js';
 import * as analyticsTools from './tools/analytics-tools.js';
 import * as adSetTools from './tools/adset-tools.js';
 import * as adTools from './tools/ad-tools.js';
+import * as pageTools from './tools/page-tools.js';
+import * as adsLibraryTools from './tools/ads-library-tools.js';
 
 const rateLimiter = new RateLimiterMemory({
   points: serverConfig.rateLimit.maxRequests,
@@ -2594,6 +2596,245 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             success: false,
             error: `Error generating campaign prompt: ${error instanceof Error ? error.message : 'Unknown error'}`,
             tool: 'generate_campaign_prompt'
+          };
+        }
+
+      
+      // Page Management Tools
+      case 'post_to_facebook':
+        try {
+          const result = await pageTools.postToFacebook(
+            userId,
+            args.pageId,
+            args.message,
+            args.link,
+            args.published
+          );
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'reply_to_comment':
+        try {
+          const result = await pageTools.replyToComment(userId, args.commentId, args.message);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_page_posts':
+        try {
+          const result = await pageTools.getPagePosts(userId, args.pageId, args.limit);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_post_comments':
+        try {
+          const result = await pageTools.getPostComments(userId, args.postId, args.limit);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'delete_post':
+        try {
+          const result = await pageTools.deletePost(userId, args.postId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'delete_comment':
+        try {
+          const result = await pageTools.deleteComment(userId, args.commentId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'filter_negative_comments':
+        try {
+          const result = await pageTools.filterNegativeComments(userId, args.postId, args.keywords);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_post_metrics':
+        try {
+          const result = await pageTools.getPostMetrics(userId, args.postId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'post_image_to_facebook':
+        try {
+          const result = await pageTools.postImageToFacebook(userId, args.pageId, args.imageUrl, args.caption);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'update_post':
+        try {
+          const result = await pageTools.updatePost(userId, args.postId, args.message);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'schedule_post':
+        try {
+          const result = await pageTools.schedulePost(
+            userId,
+            args.pageId,
+            args.message,
+            args.scheduledTime,
+            args.link
+          );
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_page_fan_count':
+        try {
+          const result = await pageTools.getPageFanCount(userId, args.pageId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_post_top_commenters':
+        try {
+          const result = await pageTools.getPostTopCommenters(userId, args.postId, args.limit);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      // Ads Library Tools
+      case 'get_meta_platform_id':
+        try {
+          const result = await adsLibraryTools.getMetaPlatformId(userId, args.brandNames);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_meta_ads':
+        try {
+          const result = await adsLibraryTools.getMetaAds(
+            userId,
+            args.platformId,
+            args.adType,
+            args.adActiveStatus,
+            args.limit,
+            args.searchTerms,
+            args.adReachedCountries,
+            args.adDeliveryDateMin,
+            args.adDeliveryDateMax
+          );
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'search_ads_library':
+        try {
+          const result = await adsLibraryTools.searchAdsLibrary(
+            userId,
+            args.searchQuery,
+            args.countries,
+            args.adType,
+            args.limit
+          );
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_competitor_ads_analysis':
+        try {
+          const result = await adsLibraryTools.getCompetitorAdsAnalysis(
+            userId,
+            args.competitorPageIds,
+            args.dateRange
+          );
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
           };
         }
 
