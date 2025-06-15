@@ -60,7 +60,8 @@ async function smartApiCall(
     
     // Try user token first
     try {
-      const userUrl = `https://graph.facebook.com/v23.0/${endpoint}?access_token=${userToken}`;
+      const separator = endpoint.includes('?') ? '&' : '?';
+      const userUrl = `https://graph.facebook.com/v23.0/${endpoint}${separator}access_token=${userToken}`;
       const userOptions: any = { method };
       if (body && method !== 'GET') {
         userOptions.headers = { 'Content-Type': 'application/json' };
@@ -81,7 +82,8 @@ async function smartApiCall(
     // If user token fails, try page token
     if (pageToken) {
       try {
-        const pageUrl = `https://graph.facebook.com/v23.0/${endpoint}?access_token=${pageToken}`;
+        const pageSeparator = endpoint.includes('?') ? '&' : '?';
+        const pageUrl = `https://graph.facebook.com/v23.0/${endpoint}${pageSeparator}access_token=${pageToken}`;
         const pageOptions: any = { method };
         if (body && method !== 'GET') {
           pageOptions.headers = { 'Content-Type': 'application/json' };
