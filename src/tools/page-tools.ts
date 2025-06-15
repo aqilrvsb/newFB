@@ -619,3 +619,104 @@ export const getPostTopCommenters = async (
     };
   }
 };
+
+// Get scheduled posts for a page using page access token
+export const getScheduledPosts = async (
+  userId: string,
+  pageId: string
+) => {
+  try {
+    const pageAccessToken = await getPageAccessToken(userId, pageId);
+    if (!pageAccessToken) {
+      return { success: false, message: 'Failed to get page access token' };
+    }
+
+    console.log(`🔍 Getting scheduled posts for page: ${pageId} with page access token`);
+
+    // Try the primary endpoint for scheduled posts with page token
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/${pageId}/promotable_posts?is_published=false&access_token=${pageAccessToken}`
+    );
+    const data: any = await response.json();
+    
+    if (data.error) {
+      console.log('❌ Primary endpoint failed, trying alternative...');
+      
+      // Try alternative endpoint with page token  
+      const altResponse = await fetch(
+        `https://graph.facebook.com/v23.0/${pageId}/feed?fields=id,message,created_time,scheduled_publish_time&published=false&access_token=${pageAccessToken}`
+      );
+      const altData: any = await altResponse.json();
+      
+      if (altData.error) {
+        // Try another alternative - published_posts with scheduled filter
+        console.log('❌ Feed endpoint failed, trying published_posts...');
+        const thirdResponse = await fetch(
+          `https://graph.facebook.com/v23.0/${pageId}/published_posts?fields=id,message,created_time,scheduled_publish_time&is_published=false&access_token=${pageAccessToken}`
+        );
+        const thirdData: any = await thirdResponse.json();
+        
+        if (thirdData.error) {
+          return {
+            success: false,
+            error: thirdData.error.message,
+            details: {
+              primaryError: data.error,
+              alternativeError: altData.error,
+              thirdError: thirdData.error,
+              suggestion: 'This endpoint may require additional permissions or the page may not have any scheduled posts'
+            }
+          };
+        }
+
+        const scheduledPosts = (thirdData.data || []).filter((post: any) => 
+          post.scheduled_publish_time && 
+          new Date(post.scheduled_publish_time) > new Date()
+        );
+
+        return {
+          success: true,
+          scheduledPosts,
+          totalScheduled: scheduledPosts.length,
+          message: `Found ${scheduledPosts.length} scheduled posts (via published_posts endpoint)`,
+          endpoint: 'published_posts'
+        };
+      }
+
+      const scheduledPosts = (altData.data || []).filter((post: any) => 
+        post.scheduled_publish_time && 
+        new Date(post.scheduled_publish_time) > new Date()
+      );
+
+      return {
+        success: true,
+        scheduledPosts,
+        totalScheduled: scheduledPosts.length,
+        message: `Found ${scheduledPosts.length} scheduled posts (via feed endpoint)`,
+        endpoint: 'feed_alternative'
+      };
+    }
+
+    // Filter for actually scheduled posts from primary endpoint
+    const scheduledPosts = (data.data || []).filter((post: any) => 
+      post.scheduled_publish_time && 
+      new Date(post.scheduled_publish_time) > new Date()
+    );
+
+    return {
+      success: true,
+      scheduledPosts,
+      totalScheduled: scheduledPosts.length,
+      message: `Found ${scheduledPosts.length} scheduled posts`,
+      endpoint: 'promotable_posts'
+    };
+
+  } catch (error: any) {
+    console.log('❌ getScheduledPosts error:', error.message);
+    return {
+      success: false,
+      error: `Error retrieving scheduled posts: ${error.message}`,
+      suggestion: 'Check if the page access token has the required permissions'
+    };
+  }
+};
