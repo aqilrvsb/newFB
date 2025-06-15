@@ -2917,20 +2917,72 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           const session = userSessionManager.getSession(userId);
           if (!session) throw new Error('User session not found');
           
+          console.log(`🔍 Getting scheduled posts for page: ${args.pageId}`);
+
+          // Try the primary endpoint for scheduled posts
           const response = await fetch(
-            `https://graph.facebook.com/v23.0/${args.pageId}/scheduled_posts?fields=id,message,scheduled_publish_time&access_token=${session.credentials.facebookAccessToken}`
+            `https://graph.facebook.com/v23.0/${args.pageId}/promotable_posts?is_published=false&access_token=${session.credentials.facebookAccessToken}`
           );
           const data: any = await response.json();
           
           if (data.error) {
-            return { success: false, error: data.error.message, tool: toolName };
+            console.log('❌ Primary endpoint failed, trying alternative...');
+            
+            // Try alternative endpoint
+            const altResponse = await fetch(
+              `https://graph.facebook.com/v23.0/${args.pageId}/feed?fields=id,message,created_time,scheduled_publish_time&published=false&access_token=${session.credentials.facebookAccessToken}`
+            );
+            const altData: any = await altResponse.json();
+            
+            if (altData.error) {
+              return {
+                success: false,
+                error: altData.error.message,
+                details: {
+                  primaryError: data.error,
+                  alternativeError: altData.error,
+                  suggestion: 'This endpoint may require additional permissions: pages_read_engagement, pages_read_user_content'
+                },
+                tool: toolName
+              };
+            }
+
+            const scheduledPosts = (altData.data || []).filter((post: any) => 
+              post.scheduled_publish_time && 
+              new Date(post.scheduled_publish_time) > new Date()
+            );
+
+            return {
+              success: true,
+              scheduledPosts,
+              totalScheduled: scheduledPosts.length,
+              message: `Found ${scheduledPosts.length} scheduled posts (via alternative endpoint)`,
+              endpoint: 'feed_alternative',
+              tool: toolName
+            };
           }
-          
-          return { success: true, scheduledPosts: data.data, tool: toolName };
+
+          // Filter for actually scheduled posts from primary endpoint
+          const scheduledPosts = (data.data || []).filter((post: any) => 
+            post.scheduled_publish_time && 
+            new Date(post.scheduled_publish_time) > new Date()
+          );
+
+          return {
+            success: true,
+            scheduledPosts,
+            totalScheduled: scheduledPosts.length,
+            message: `Found ${scheduledPosts.length} scheduled posts`,
+            endpoint: 'promotable_posts',
+            tool: toolName
+          };
+
         } catch (error) {
+          console.log('❌ get_scheduled_posts error:', error);
           return {
             success: false,
-            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            error: `Error retrieving scheduled posts: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            suggestion: 'Check if the page access token has the required permissions',
             tool: toolName
           };
         }
