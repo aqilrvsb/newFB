@@ -1237,29 +1237,111 @@ export const getNumberOfLikesSmart = async (userId: string, postId: string) => {
   }
 };
 
-// 4. Smart reply_to_comment  
+// Smart API call for comment operations - tries all available page tokens
+async function smartCommentApiCall(
+  userId: string,
+  endpoint: string,
+  method: 'POST' | 'DELETE' = 'POST',
+  body?: any
+): Promise<SmartApiResult> {
+  try {
+    const { userSessionManager } = await import('../config.js');
+    const session = userSessionManager.getSession(userId);
+    
+    if (!session) {
+      return { success: false, message: 'User session not found' };
+    }
+
+    const userToken = session.credentials.facebookAccessToken;
+    
+    // Try to get all page tokens for this user
+    try {
+      const pagesResult = await getUserFacebookPages(userToken);
+      if (pagesResult.success && pagesResult.pages) {
+        // Try each page token
+        for (const page of pagesResult.pages) {
+          if (page.access_token) {
+            try {
+              const separator = endpoint.includes('?') ? '&' : '?';
+              const pageUrl = `https://graph.facebook.com/v23.0/${endpoint}${separator}access_token=${page.access_token}`;
+              const pageOptions: any = { method };
+              
+              if (body && method === 'POST') {
+                pageOptions.headers = { 'Content-Type': 'application/json' };
+                pageOptions.body = JSON.stringify(body);
+              }
+              
+              const pageResponse = await fetch(pageUrl, pageOptions);
+              const pageData = await pageResponse.json() as FacebookApiResponse;
+              
+              if (!pageData.error) {
+                return { success: true, data: pageData };
+              }
+            } catch (pageError) {
+              // Continue to next page token
+            }
+          }
+        }
+      }
+    } catch (pagesError) {
+      // Fall back to user token
+    }
+    
+    // Try user token as fallback
+    try {
+      const separator = endpoint.includes('?') ? '&' : '?';
+      const userUrl = `https://graph.facebook.com/v23.0/${endpoint}${separator}access_token=${userToken}`;
+      const userOptions: any = { method };
+      
+      if (body && method === 'POST') {
+        userOptions.headers = { 'Content-Type': 'application/json' };
+        userOptions.body = JSON.stringify(body);
+      }
+      
+      const userResponse = await fetch(userUrl, userOptions);
+      const userData = await userResponse.json() as FacebookApiResponse;
+      
+      if (!userData.error) {
+        return { success: true, data: userData };
+      }
+      
+      return { success: false, message: userData.error.message };
+    } catch (userError) {
+      return { success: false, message: 'All token attempts failed' };
+    }
+  } catch (error) {
+    return { 
+      success: false, 
+      message: `Error in smart comment API call: ${error instanceof Error ? error.message : 'Unknown error'}` 
+    };
+  }
+}  
 export const replyToCommentSmart = async (
   userId: string,
   commentId: string,
   message: string
 ) => {
   try {
-    const result = await smartApiCall(
+    const result = await smartCommentApiCall(
       userId,
-      commentId,
       `${commentId}/comments`,
       'POST',
       { message }
     );
     
     if (!result.success) {
-      return { success: false, message: result.message };
+      return { 
+        success: false, 
+        message: result.message, 
+        tool: 'reply_to_comment_smart' 
+      };
     }
     
     return {
       success: true,
-      commentId: result.data?.id,
-      message: 'Reply posted successfully',
+      commentId,
+      replyId: result.data?.id,
+      message: 'Reply posted successfully using smart token system',
       tool: 'reply_to_comment_smart'
     };
   } catch (error) {
@@ -1274,20 +1356,24 @@ export const replyToCommentSmart = async (
 // 5. Smart delete_comment
 export const deleteCommentSmart = async (userId: string, commentId: string) => {
   try {
-    const result = await smartApiCall(
+    const result = await smartCommentApiCall(
       userId,
-      commentId,
       commentId,
       'DELETE'
     );
     
     if (!result.success) {
-      return { success: false, message: result.message };
+      return { 
+        success: false, 
+        message: result.message, 
+        tool: 'delete_comment_smart' 
+      };
     }
     
     return {
       success: true,
-      message: 'Comment deleted successfully',
+      commentId,
+      message: 'Comment deleted successfully using smart token system',
       tool: 'delete_comment_smart'
     };
   } catch (error) {
