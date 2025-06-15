@@ -3376,6 +3376,67 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           };
         }
 
+      // SMART TOKEN TOOLS - Auto fallback user->page tokens
+      case 'get_post_comments_smart':
+        try {
+          const result = await pageTools.getPostCommentsSmart(userId, args.postId, args.limit);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_number_of_comments_smart':
+        try {
+          const result = await pageTools.getNumberOfCommentsSmart(userId, args.postId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_number_of_likes_smart':
+        try {
+          const result = await pageTools.getNumberOfLikesSmart(userId, args.postId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'reply_to_comment_smart':
+        try {
+          const result = await pageTools.replyToCommentSmart(userId, args.commentId, args.message);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'delete_comment_smart':
+        try {
+          const result = await pageTools.deleteCommentSmart(userId, args.commentId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
       default:
         return {
           success: false,

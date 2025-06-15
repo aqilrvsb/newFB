@@ -20,6 +20,83 @@ async function getPageAccessToken(userId: string, pageId: string): Promise<strin
 }
 
 // Helper to get user's Facebook pages
+
+// Smart token fallback - Try user token first, then page token
+async function smartApiCall(
+  userId: string, 
+  postId: string, 
+  endpoint: string, 
+  method: 'GET' | 'POST' | 'DELETE' = 'GET',
+  body?: any
+): Promise<{ success: boolean; data?: any; message?: string }> {
+  try {
+    const { userSessionManager } = await import('../config.js');
+    const session = userSessionManager.getSession(userId);
+    if (!session) {
+      return { success: false, message: 'User session not found' };
+    }
+
+    // Extract page ID from post ID if possible
+    const pageId = postId.includes('_') ? postId.split('_')[0] : postId;
+    
+    // Get both tokens
+    const userToken = session.credentials.facebookAccessToken;
+    const pageToken = await getPageAccessToken(userId, pageId);
+    
+    // Try user token first
+    try {
+      const userUrl = `https://graph.facebook.com/v23.0/${endpoint}?access_token=${userToken}`;
+      const userOptions: any = { method };
+      if (body && method !== 'GET') {
+        userOptions.headers = { 'Content-Type': 'application/json' };
+        userOptions.body = JSON.stringify(body);
+      }
+      
+      const userResponse = await fetch(userUrl, userOptions);
+      const userData = await userResponse.json();
+      
+      // If user token works, return the result
+      if (!userData.error) {
+        return { success: true, data: userData };
+      }
+    } catch (userError) {
+      console.log('User token failed, trying page token...');
+    }
+    
+    // If user token fails, try page token
+    if (pageToken) {
+      try {
+        const pageUrl = `https://graph.facebook.com/v23.0/${endpoint}?access_token=${pageToken}`;
+        const pageOptions: any = { method };
+        if (body && method !== 'GET') {
+          pageOptions.headers = { 'Content-Type': 'application/json' };
+          pageOptions.body = JSON.stringify(body);
+        }
+        
+        const pageResponse = await fetch(pageUrl, pageOptions);
+        const pageData = await pageResponse.json();
+        
+        if (!pageData.error) {
+          return { success: true, data: pageData };
+        }
+        
+        return { success: false, message: pageData.error.message };
+      } catch (pageError) {
+        return { success: false, message: 'Both user and page tokens failed' };
+      }
+    }
+    
+    return { success: false, message: 'No valid tokens available' };
+    
+  } catch (error) {
+    return { 
+      success: false, 
+      message: `Smart API call failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+    };
+  }
+}
+
+
 async function getUserFacebookPages(accessToken: string): Promise<any> {
   try {
     const response = await fetch(
@@ -1045,6 +1122,162 @@ export const getCommentsFixed = async (userId: string, postId: string) => {
     return {
       success: false,
       message: `Error getting comment count: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+
+// SMART TOKEN VERSIONS - Auto fallback between user and page tokens
+
+// 1. Smart get_post_comments
+export const getPostCommentsSmart = async (
+  userId: string,
+  postId: string,
+  limit: number = 25
+) => {
+  try {
+    const result = await smartApiCall(
+      userId, 
+      postId, 
+      `${postId}/comments?fields=id,message,from,created_time,like_count,comment_count&limit=${limit}`
+    );
+    
+    if (!result.success) {
+      return { success: false, message: result.message };
+    }
+    
+    return {
+      success: true,
+      comments: result.data?.data || [],
+      paging: result.data?.paging,
+      message: `Retrieved ${result.data?.data?.length || 0} comments`,
+      tool: 'get_post_comments_smart'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting post comments: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      tool: 'get_post_comments_smart'
+    };
+  }
+};
+
+// 2. Smart get_number_of_comments  
+export const getNumberOfCommentsSmart = async (userId: string, postId: string) => {
+  try {
+    const result = await smartApiCall(
+      userId,
+      postId,
+      `${postId}?fields=comments.summary(true)`
+    );
+    
+    if (!result.success) {
+      return { success: false, message: result.message };
+    }
+    
+    return {
+      success: true,
+      postId,
+      commentCount: result.data?.comments?.summary?.total_count || 0,
+      message: `Post has ${result.data?.comments?.summary?.total_count || 0} comments`,
+      tool: 'get_number_of_comments_smart'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting comment count: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      tool: 'get_number_of_comments_smart'
+    };
+  }
+};
+
+// 3. Smart get_number_of_likes
+export const getNumberOfLikesSmart = async (userId: string, postId: string) => {
+  try {
+    const result = await smartApiCall(
+      userId,
+      postId,
+      `${postId}?fields=reactions.summary(true)`
+    );
+    
+    if (!result.success) {
+      return { success: false, message: result.message };
+    }
+    
+    return {
+      success: true,
+      postId,
+      likeCount: result.data?.reactions?.summary?.total_count || 0,
+      message: `Post has ${result.data?.reactions?.summary?.total_count || 0} likes`,
+      tool: 'get_number_of_likes_smart'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting like count: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      tool: 'get_number_of_likes_smart'
+    };
+  }
+};
+
+// 4. Smart reply_to_comment  
+export const replyToCommentSmart = async (
+  userId: string,
+  commentId: string,
+  message: string
+) => {
+  try {
+    const result = await smartApiCall(
+      userId,
+      commentId,
+      `${commentId}/comments`,
+      'POST',
+      { message }
+    );
+    
+    if (!result.success) {
+      return { success: false, message: result.message };
+    }
+    
+    return {
+      success: true,
+      commentId: result.data?.id,
+      message: 'Reply posted successfully',
+      tool: 'reply_to_comment_smart'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error replying to comment: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      tool: 'reply_to_comment_smart'
+    };
+  }
+};
+
+// 5. Smart delete_comment
+export const deleteCommentSmart = async (userId: string, commentId: string) => {
+  try {
+    const result = await smartApiCall(
+      userId,
+      commentId,
+      commentId,
+      'DELETE'
+    );
+    
+    if (!result.success) {
+      return { success: false, message: result.message };
+    }
+    
+    return {
+      success: true,
+      message: 'Comment deleted successfully',
+      tool: 'delete_comment_smart'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error deleting comment: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      tool: 'delete_comment_smart'
     };
   }
 };
