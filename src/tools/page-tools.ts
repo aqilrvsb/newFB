@@ -1,5 +1,20 @@
 import { getAdAccountForUser } from '../config.js';
 
+// Type definitions for API responses
+interface FacebookApiResponse {
+  error?: {
+    message: string;
+    code: number;
+  };
+  [key: string]: any;
+}
+
+interface SmartApiResult {
+  success: boolean;
+  data?: any;
+  message?: string;
+}
+
 // Helper function to get page access token
 async function getPageAccessToken(userId: string, pageId: string): Promise<string | null> {
   try {
@@ -53,7 +68,7 @@ async function smartApiCall(
       }
       
       const userResponse = await fetch(userUrl, userOptions);
-      const userData = await userResponse.json();
+      const userData = await userResponse.json() as FacebookApiResponse;
       
       // If user token works, return the result
       if (!userData.error) {
@@ -74,7 +89,7 @@ async function smartApiCall(
         }
         
         const pageResponse = await fetch(pageUrl, pageOptions);
-        const pageData = await pageResponse.json();
+        const pageData = await pageResponse.json() as FacebookApiResponse;
         
         if (!pageData.error) {
           return { success: true, data: pageData };
@@ -1106,7 +1121,7 @@ export const getCommentsFixed = async (userId: string, postId: string) => {
     const response = await fetch(
       `https://graph.facebook.com/v23.0/${postId}?fields=comments.summary(true)&access_token=${pageAccessToken}`
     );
-    const result = await response.json();
+    const result = await response.json() as FacebookApiResponse;
     
     if (result.error) {
       return { success: false, message: result.error.message };
