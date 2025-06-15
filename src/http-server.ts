@@ -3219,6 +3219,151 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           };
         }
 
+      // Missing page management tools
+      case 'send_dm_to_user':
+        try {
+          const result = await pageTools.sendDmToUser(userId, args.recipientId, args.message);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'delete_comment_from_post':
+        try {
+          const result = await pageTools.deleteCommentFromPost(userId, args.commentId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_number_of_comments':
+        try {
+          const result = await pageTools.getNumberOfComments(userId, args.postId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_number_of_likes':
+        try {
+          const result = await pageTools.getNumberOfLikes(userId, args.postId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_post_impressions':
+        try {
+          const result = await pageTools.getPostImpressions(userId, args.postId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_post_impressions_unique':
+        try {
+          const result = await pageTools.getPostImpressionsUnique(userId, args.postId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_post_impressions_paid':
+        try {
+          const result = await pageTools.getPostImpressionsPaid(userId, args.postId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_post_impressions_organic':
+        try {
+          const result = await pageTools.getPostImpressionsOrganic(userId, args.postId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_post_engaged_users':
+        try {
+          const result = await pageTools.getPostEngagedUsers(userId, args.postId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_post_clicks':
+        try {
+          const result = await pageTools.getPostClicks(userId, args.postId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_post_reactions_like_total':
+        try {
+          const result = await pageTools.getPostReactionsLikeTotal(userId, args.postId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_post_share_count':
+        try {
+          const result = await pageTools.getPostShareCount(userId, args.postId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
       default:
         return {
           success: false,
