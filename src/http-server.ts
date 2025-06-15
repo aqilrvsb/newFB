@@ -3364,6 +3364,18 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           };
         }
 
+      case 'get_comments_fixed':
+        try {
+          const result = await pageTools.getCommentsFixed(userId, args.postId);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
       default:
         return {
           success: false,

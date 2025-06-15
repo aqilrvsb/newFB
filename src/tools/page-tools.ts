@@ -1015,6 +1015,40 @@ export const getPostShareCount = async (userId: string, postId: string) => {
   }
 };
 
+
+// FIXED VERSION - Get number of comments using page access token
+export const getCommentsFixed = async (userId: string, postId: string) => {
+  try {
+    // Extract page ID from post ID (format: pageId_postId)
+    const pageId = postId.split('_')[0];
+    const pageAccessToken = await getPageAccessToken(userId, pageId);
+    if (!pageAccessToken) {
+      return { success: false, message: 'Failed to get page access token' };
+    }
+
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/${postId}?fields=comments.summary(true)&access_token=${pageAccessToken}`
+    );
+    const result = await response.json();
+    
+    if (result.error) {
+      return { success: false, message: result.error.message };
+    }
+    
+    return {
+      success: true,
+      postId,
+      commentCount: result.comments?.summary?.total_count || 0,
+      message: `Post has ${result.comments?.summary?.total_count || 0} comments`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting comment count: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
 // Alias for delete_comment
 export const deleteCommentFromPost = async (userId: string, commentId: string) => {
   return await deleteComment(userId, commentId);
