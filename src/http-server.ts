@@ -1849,7 +1849,15 @@ async function getUserFacebookPages(userId: string): Promise<any> {
     // Use SDK to get Facebook pages
     const { User } = require('facebook-nodejs-business-sdk');
     const user = new User('me');
-    const pagesData = await user.getAccounts(['id', 'name', 'access_token', 'category', 'category_list', 'tasks', 'about', 'website', 'emails']);
+    // Ensure SDK is initialized before making the call
+          if (!session?.credentials?.facebookAccessToken) {
+            throw new Error('No Facebook access token available');
+          }
+          
+          const { FacebookAdsApi } = require('facebook-nodejs-business-sdk');
+          FacebookAdsApi.init(session.credentials.facebookAccessToken);
+          
+          const pagesData = await user.getAccounts(['id', 'name', 'access_token', 'category', 'category_list', 'tasks', 'about', 'website', 'emails']);
     
     if (pagesData.error) {
       return {
@@ -1916,6 +1924,23 @@ async function getUserFacebookPages(userId: string): Promise<any> {
       error: errorMessage,
       tool: 'get_facebook_pages'
     };
+  }
+}
+
+
+// Helper function to ensure Facebook SDK is properly initialized
+function ensureFacebookSDKInitialized(session: any): boolean {
+  if (!session?.credentials?.facebookAccessToken) {
+    return false;
+  }
+  
+  try {
+    const { FacebookAdsApi } = require('facebook-nodejs-business-sdk');
+    FacebookAdsApi.init(session.credentials.facebookAccessToken);
+    return true;
+  } catch (error) {
+    console.error('Failed to initialize Facebook SDK:', error);
+    return false;
   }
 }
 
@@ -2012,7 +2037,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             errorMessage = `Facebook API Error: ${error.response.error.message}`;
           } else if (error.message?.includes('ECONNRESET') || error.code === 'ECONNRESET') {
             errorMessage = 'Connection to Facebook was reset. Please try again.';
-          } else if (error.message === 'The request was made but no response was received') {
+          } else if (error.message === 'Facebook API call failed. This usually indicates an expired token or network issue') {
             errorMessage = 'Facebook API timeout. Please check your internet connection and try again.';
           } else if (error.message) {
             errorMessage += error.message;
@@ -2029,6 +2054,14 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
         
       case 'get_campaigns':
         try {
+          if (!ensureFacebookSDKInitialized(session)) {
+            return {
+              success: false,
+              error: 'Facebook SDK initialization failed. Please re-authenticate.',
+              tool: 'get_campaigns'
+            };
+          }
+          
           const limit = args.limit || 10;
           const status = args.status;
 
@@ -2044,13 +2077,13 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             } : undefined,
             error: result.success ? undefined : result.message
           };
-        } catch (error) {
-          return {
-            success: false,
-            error: `Error getting campaigns: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            tool: 'get_campaigns'
-          };
-        }
+          } catch (error) {
+            return {
+              success: false,
+              error: `Error getting campaigns: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              tool: 'get_campaigns'
+            };
+          }
         try {
           // Get ALL user's ad accounts using SDK
           const { User } = require('facebook-nodejs-business-sdk');
