@@ -42,7 +42,18 @@ export const getAccountInsights = async (
     // Check if dateRange contains a comma (custom date range)
     let params: any = {};
     
-    if (dateRange.includes(',')) {
+    if (dateRange.includes(' to ') || dateRange.includes('_to_')) {
+      // Custom date range format: "16-06-2025 to 18-06-2025" or "16-06-2025_to_18-06-2025"
+      const separator = dateRange.includes('_to_') ? '_to_' : ' to ';
+      const [start, end] = dateRange.split(separator);
+      // Convert DD-MM-YYYY to YYYY-MM-DD
+      const startParts = start.trim().split('-');
+      const endParts = end.trim().split('-');
+      params.time_range = {
+        since: `${startParts[2]}-${startParts[1]}-${startParts[0]}`,
+        until: `${endParts[2]}-${endParts[1]}-${endParts[0]}`
+      };
+    } else if (dateRange.includes(',')) {
       // Custom date range format: "2025-06-01,2025-06-21"
       const [startDate, endDate] = dateRange.split(',');
       params.time_range = {
@@ -177,9 +188,10 @@ export const getTotalSpendAllAccounts = async (
         let params: any = {};
         
         // Check if dateRange is a custom format
-        if (dateRange.includes(' to ')) {
-          // Custom date range format: "16-06-2025 to 18-06-2025"
-          const [start, end] = dateRange.split(' to ');
+        if (dateRange.includes(' to ') || dateRange.includes('_to_')) {
+          // Custom date range format: "16-06-2025 to 18-06-2025" or "16-06-2025_to_18-06-2025"
+          const separator = dateRange.includes('_to_') ? '_to_' : ' to ';
+          const [start, end] = dateRange.split(separator);
           // Convert DD-MM-YYYY to YYYY-MM-DD
           const startParts = start.trim().split('-');
           const endParts = end.trim().split('-');
@@ -320,7 +332,30 @@ export const getSpendByCampaign = async (
         // Now get insights for each campaign
         for (const campaign of campaignsData) {
           try {
-            const campaignInsights = await campaign.getInsights(insightFields, { date_preset: dateRange });
+            // Build params for campaign insights based on date range
+            let campaignParams: any = {};
+            
+            if (dateRange.includes(' to ') || dateRange.includes('_to_')) {
+              // Custom date range format
+              const separator = dateRange.includes('_to_') ? '_to_' : ' to ';
+              const [start, end] = dateRange.split(separator);
+              const startParts = start.trim().split('-');
+              const endParts = end.trim().split('-');
+              campaignParams.time_range = {
+                since: `${startParts[2]}-${startParts[1]}-${startParts[0]}`,
+                until: `${endParts[2]}-${endParts[1]}-${endParts[0]}`
+              };
+            } else if (dateRange.includes(',')) {
+              const [startDate, endDate] = dateRange.split(',');
+              campaignParams.time_range = {
+                since: startDate.trim(),
+                until: endDate.trim()
+              };
+            } else {
+              campaignParams.date_preset = dateRange;
+            }
+            
+            const campaignInsights = await campaign.getInsights(insightFields, campaignParams);
             
             if (campaignInsights && campaignInsights.length > 0) {
               const insight = campaignInsights[0];
