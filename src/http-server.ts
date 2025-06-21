@@ -1939,12 +1939,37 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           // Use Facebook SDK instead of fetch - fixes Railway deployment issue
           const User = require('facebook-nodejs-business-sdk').User;
           
+          // Ensure we have a valid token
+          if (!session.credentials?.facebookAccessToken) {
+            return {
+              success: false,
+              error: 'No Facebook access token found. Please re-authenticate.',
+              tool: 'get_ad_accounts'
+            };
+          }
+          
+          // Re-initialize SDK to ensure it's using the latest token
+          FacebookAdsApi.init(session.credentials.facebookAccessToken);
+          
           // Get user's ad accounts using SDK
           const user = new User('me');
           const fields = ['id', 'name', 'account_status', 'currency', 'timezone_name'];
           const params = { limit: 100 };
           
-          const accountsResponse = await user.getAdAccounts(fields, params);
+          let accountsResponse;
+          try {
+            accountsResponse = await user.getAdAccounts(fields, params);
+          } catch (fbError: any) {
+            console.error('Facebook SDK error:', fbError);
+            if (fbError.response?.error?.message) {
+              return {
+                success: false,
+                error: `Facebook API Error: ${fbError.response.error.message}`,
+                tool: 'get_ad_accounts'
+              };
+            }
+            throw fbError;
+          }
           
           // Convert to array if needed
           const accountsArray = Array.isArray(accountsResponse) ? accountsResponse : accountsResponse.data || [];
@@ -1978,10 +2003,26 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
               message: `Found ${accounts.length} ad account(s)`
             }
           };
-        } catch (error) {
+        } catch (error: any) {
+          console.error('Error in get_ad_accounts:', error);
+          
+          let errorMessage = 'Error fetching ad accounts: ';
+          
+          if (error.response?.error?.message) {
+            errorMessage = `Facebook API Error: ${error.response.error.message}`;
+          } else if (error.message?.includes('ECONNRESET') || error.code === 'ECONNRESET') {
+            errorMessage = 'Connection to Facebook was reset. Please try again.';
+          } else if (error.message === 'The request was made but no response was received') {
+            errorMessage = 'Facebook API timeout. Please check your internet connection and try again.';
+          } else if (error.message) {
+            errorMessage += error.message;
+          } else {
+            errorMessage += 'Unknown error occurred';
+          }
+          
           return {
             success: false,
-            error: `Error fetching ad accounts: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            error: errorMessage,
             tool: 'get_ad_accounts'
           };
         }
