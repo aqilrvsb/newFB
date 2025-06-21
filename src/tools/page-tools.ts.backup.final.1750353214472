@@ -1,0 +1,1550 @@
+import { getAdAccountForUser } from '../config.js';
+
+const { FacebookAdsApi } = require('facebook-nodejs-business-sdk');
+const { Page } = require('facebook-nodejs-business-sdk');
+const { User } = require('facebook-nodejs-business-sdk');
+
+// Type definitions for API responses
+interface FacebookApiResponse {
+  error?: {
+    message: string;
+    code: number;
+  };
+  [key: string]: any;
+}
+
+interface SmartApiResult {
+  success: boolean;
+  data?: any;
+  message?: string;
+}
+
+// Helper function to get page access token
+async function getPageAccessToken(userId: string, pageId: string): Promise<string | null> {
+  try {
+    const { userSessionManager } = await import('../config.js');
+    const session = userSessionManager.getSession(userId);
+    if (!session) return null;
+
+    // Get page access token from stored pages or fetch it
+    const pagesResult = await getUserFacebookPages(session.credentials.facebookAccessToken);
+    if (pagesResult.success && pagesResult.pages) {
+      const page = pagesResult.pages.find((p: any) => p.id === pageId);
+      return page?.access_token || null;
+    }
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
+// Helper to get user's Facebook pages
+
+// Smart token fallback - Try user token first, then page token
+async function smartApiCall(
+  userId: string, 
+  postId: string, 
+  endpoint: string, 
+  method: 'GET' | 'POST' | 'DELETE' = 'GET',
+  body?: any
+): Promise<{ success: boolean; data?: any; message?: string }> {
+  try {
+    const { userSessionManager } = await import('../config.js');
+    const session = userSessionManager.getSession(userId);
+    if (!session) {
+      return { success: false, message: 'User session not found' };
+    }
+
+    // Extract page ID from post ID if possible
+    const pageId = postId.includes('_') ? postId.split('_')[0] : postId;
+    
+    // Get both tokens
+    const userToken = session.credentials.facebookAccessToken;
+    const pageToken = await getPageAccessToken(userId, pageId);
+    
+    // Try user token first
+    try {
+      const separator = endpoint.includes('?') ? '&' : '?';
+      const userUrl = `https://graph.facebook.com/v23.0/${endpoint}${separator}access_token=${userToken}`;
+      const userOptions: any = { method };
+      if (body && method !== 'GET') {
+        userOptions.headers = { 'Content-Type': 'application/json' };
+        userOptions.body = JSON.stringify(body);
+      }
+      
+      const userResponse = await fetch(userUrl, userOptions);
+      const userData = await userResponse.json() as FacebookApiResponse;
+      
+      // If user token works, return the result
+      if (!userData.error) {
+        return { success: true, data: userData };
+      }
+    } catch (userError) {
+      console.log('User token failed, trying page token...');
+    }
+    
+    // If user token fails, try page token
+    if (pageToken) {
+      try {
+        const pageSeparator = endpoint.includes('?') ? '&' : '?';
+        const pageUrl = `https://graph.facebook.com/v23.0/${endpoint}${pageSeparator}access_token=${pageToken}`;
+        const pageOptions: any = { method };
+        if (body && method !== 'GET') {
+          pageOptions.headers = { 'Content-Type': 'application/json' };
+          pageOptions.body = JSON.stringify(body);
+        }
+        
+        const pageResponse = await fetch(pageUrl, pageOptions);
+        const pageData = await pageResponse.json() as FacebookApiResponse;
+        
+        if (!pageData.error) {
+          return { success: true, data: pageData };
+        }
+        
+        return { success: false, message: pageData.error.message };
+      } catch (pageError) {
+        return { success: false, message: 'Both user and page tokens failed' };
+      }
+    }
+    
+    return { success: false, message: 'No valid tokens available' };
+    
+  } catch (error) {
+    return { 
+      success: false, 
+      message: `Smart API call failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+    };
+  }
+}
+
+
+async function getUserFacebookPages(accessToken: string): Promise<any> {
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/me/accounts?fields=id,name,access_token,category&access_token=${accessToken}`
+    );
+    const data: any = await response.json();
+    
+    if (data.error) {
+      return { success: false, error: data.error.message };
+    }
+    
+    return { success: true, pages: data.data || [] };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+// Post to Facebook Page
+export const postToFacebook = async (
+  userId: string,
+  pageId: string,
+  message: string,
+  link?: string,
+  published?: boolean
+) => {
+  try {
+    const pageAccessToken = await getPageAccessToken(userId, pageId);
+    if (!pageAccessToken) {
+      return { success: false, message: 'Failed to get page access token' };
+    }
+
+    const params: any = { message, access_token: pageAccessToken };
+    if (link) params.link = link;
+    if (published !== undefined) params.published = published;
+
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/${pageId}/feed`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params)
+      }
+    );
+
+    const result: any = await response.json();
+    
+    if (result.error) {
+      return { success: false, message: result.error.message };
+    }
+
+    return {
+      success: true,
+      postId: result.id,
+      message: 'Post created successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error posting to Facebook: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Reply to a comment
+export const replyToComment = async (
+  userId: string,
+  commentId: string,
+  message: string
+) => {
+  try {
+    const { userSessionManager } = await import('../config.js');
+    const session = userSessionManager.getSession(userId);
+    if (!session) {
+      throw new Error('User session not found');
+    }
+
+    // Try to extract page ID from comment ID pattern
+    let pageId = '';
+    if (commentId.includes('_')) {
+      const parts = commentId.split('_');
+      pageId = parts[0];
+    }
+
+    if (!pageId) {
+      // If no page ID found, we need to fetch the comment details first
+      const commentResponse = await fetch(
+        `https://graph.facebook.com/v23.0/${commentId}?fields=parent&access_token=${session.credentials.facebookAccessToken}`
+      );
+      const commentData: any = await commentResponse.json();
+      
+      if (commentData.parent && commentData.parent.id) {
+        pageId = commentData.parent.id.split('_')[0];
+      }
+    }
+
+    if (!pageId) {
+      return { success: false, message: 'Could not determine page ID for comment' };
+    }
+
+    const pageAccessToken = await getPageAccessToken(userId, pageId);
+    if (!pageAccessToken) {
+      return { success: false, message: 'Failed to get page access token' };
+    }
+
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/${commentId}/comments`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message,
+          access_token: pageAccessToken
+        })
+      }
+    );
+
+    const result: any = await response.json();
+    
+    if (result.error) {
+      return { success: false, message: result.error.message };
+    }
+
+    return {
+      success: true,
+      commentId: result.id,
+      message: 'Reply posted successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error replying to comment: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Get page posts
+export const getPagePosts = async (
+  userId: string,
+  pageId: string,
+  limit: number = 25
+) => {
+  try {
+    const pageAccessToken = await getPageAccessToken(userId, pageId);
+    if (!pageAccessToken) {
+      return { success: false, message: 'Failed to get page access token' };
+    }
+
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/${pageId}/posts?fields=id,message,created_time,from,shares,reactions.summary(true),comments.summary(true)&limit=${limit}&access_token=${pageAccessToken}`
+    );
+
+    const result: any = await response.json();
+    
+    if (result.error) {
+      return { success: false, message: result.error.message };
+    }
+
+    return {
+      success: true,
+      posts: result.data || [],
+      paging: result.paging,
+      message: `Retrieved ${result.data?.length || 0} posts`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting page posts: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Get post comments
+export const getPostComments = async (
+  userId: string,
+  postId: string,
+  limit: number = 25
+) => {
+  try {
+    const { userSessionManager } = await import('../config.js');
+    const session = userSessionManager.getSession(userId);
+    if (!session) {
+      throw new Error('User session not found');
+    }
+
+    // Try with user token first
+    let response = await fetch(
+      `https://graph.facebook.com/v23.0/${postId}/comments?fields=id,message,from,created_time,like_count,comment_count&limit=${limit}&access_token=${session.credentials.facebookAccessToken}`
+    );
+
+    let result: any = await response.json();
+    
+    // If failed with user token, try page token
+    if (result.error && result.error.message.includes('OAuth')) {
+      const pageId = postId.split('_')[0];
+      const pageAccessToken = await getPageAccessToken(userId, pageId);
+      if (pageAccessToken) {
+        response = await fetch(
+          `https://graph.facebook.com/v23.0/${postId}/comments?fields=id,message,from,created_time,like_count,comment_count&limit=${limit}&access_token=${pageAccessToken}`
+        );
+        result = await response.json();
+      }
+    }
+    
+    if (result.error) {
+      return { success: false, message: result.error.message };
+    }
+
+    return {
+      success: true,
+      comments: result.data || [],
+      paging: result.paging,
+      message: `Retrieved ${result.data?.length || 0} comments`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting post comments: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Delete post
+export const deletePost = async (userId: string, postId: string) => {
+  try {
+    const { userSessionManager } = await import('../config.js');
+    const session = userSessionManager.getSession(userId);
+    if (!session) {
+      throw new Error('User session not found');
+    }
+
+    // Extract page ID from post ID
+    const pageId = postId.split('_')[0];
+    const pageAccessToken = await getPageAccessToken(userId, pageId);
+    if (!pageAccessToken) {
+      return { success: false, message: 'Failed to get page access token' };
+    }
+
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/${postId}?access_token=${pageAccessToken}`,
+      { method: 'DELETE' }
+    );
+
+    const result: any = await response.json();
+    
+    if (result.error) {
+      return { success: false, message: result.error.message };
+    }
+
+    return {
+      success: result.success || true,
+      message: 'Post deleted successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error deleting post: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Delete comment
+export const deleteComment = async (userId: string, commentId: string) => {
+  try {
+    const { userSessionManager } = await import('../config.js');
+    const session = userSessionManager.getSession(userId);
+    if (!session) {
+      throw new Error('User session not found');
+    }
+
+    // Try to extract page ID from comment ID pattern
+    let pageId = '';
+    if (commentId.includes('_')) {
+      const parts = commentId.split('_');
+      pageId = parts[0];
+    }
+
+    if (!pageId) {
+      // If no page ID found, we need to fetch the comment details first
+      const commentResponse = await fetch(
+        `https://graph.facebook.com/v23.0/${commentId}?fields=parent&access_token=${session.credentials.facebookAccessToken}`
+      );
+      const commentData: any = await commentResponse.json();
+      
+      if (commentData.parent && commentData.parent.id) {
+        pageId = commentData.parent.id.split('_')[0];
+      }
+    }
+
+    if (!pageId) {
+      return { success: false, message: 'Could not determine page ID for comment' };
+    }
+
+    const pageAccessToken = await getPageAccessToken(userId, pageId);
+    if (!pageAccessToken) {
+      return { success: false, message: 'Failed to get page access token' };
+    }
+
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/${commentId}?access_token=${pageAccessToken}`,
+      { method: 'DELETE' }
+    );
+
+    const result: any = await response.json();
+    
+    if (result.error) {
+      return { success: false, message: result.error.message };
+    }
+
+    return {
+      success: result.success || true,
+      message: 'Comment deleted successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error deleting comment: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Filter negative comments
+export const filterNegativeComments = async (
+  userId: string,
+  postId: string,
+  keywords: string[] = ['spam', 'scam', 'fake', 'hate', 'terrible', 'worst']
+) => {
+  try {
+    const commentsResult = await getPostComments(userId, postId, 100);
+    
+    if (!commentsResult.success) {
+      return commentsResult;
+    }
+
+    const negativeComments = commentsResult.comments.filter((comment: any) => {
+      const lowerMessage = comment.message?.toLowerCase() || '';
+      return keywords.some(keyword => lowerMessage.includes(keyword.toLowerCase()));
+    });
+
+    return {
+      success: true,
+      negativeComments,
+      totalComments: commentsResult.comments.length,
+      negativeCount: negativeComments.length,
+      keywords: keywords,
+      message: `Found ${negativeComments.length} negative comments out of ${commentsResult.comments.length} total`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error filtering comments: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Get post metrics
+export const getPostMetrics = async (userId: string, postId: string) => {
+  try {
+    const { userSessionManager } = await import('../config.js');
+    const session = userSessionManager.getSession(userId);
+    if (!session) {
+      throw new Error('User session not found');
+    }
+
+    // For insights, we need page token
+    const pageId = postId.includes('_') ? postId.split('_')[0] : '';
+    if (!pageId) {
+      return { success: false, message: 'Invalid post ID format' };
+    }
+
+    const pageAccessToken = await getPageAccessToken(userId, pageId);
+    if (!pageAccessToken) {
+      return { success: false, message: 'Failed to get page access token' };
+    }
+
+    // Get basic post data first
+    const postResponse = await fetch(
+      `https://graph.facebook.com/v23.0/${postId}?fields=reactions.summary(true),comments.summary(true),shares&access_token=${pageAccessToken}`
+    );
+    const postData: any = await postResponse.json();
+    
+    if (postData.error) {
+      return { success: false, message: postData.error.message };
+    }
+
+    // Get insights separately
+    const insightsResponse = await fetch(
+      `https://graph.facebook.com/v23.0/${postId}/insights?metric=post_impressions,post_impressions_unique,post_impressions_paid,post_impressions_organic,post_engaged_users,post_clicks&access_token=${pageAccessToken}`
+    );
+    const insightsData: any = await insightsResponse.json();
+    
+    // Extract insights data
+    const insights: any = {};
+    if (insightsData.data) {
+      insightsData.data.forEach((metric: any) => {
+        insights[metric.name] = metric.values?.[0]?.value || 0;
+      });
+    }
+
+    return {
+      success: true,
+      postId,
+      metrics: {
+        likes: postData.reactions?.summary?.total_count || 0,
+        comments: postData.comments?.summary?.total_count || 0,
+        shares: postData.shares?.count || 0,
+        impressions: insights.post_impressions || 0,
+        impressionsUnique: insights.post_impressions_unique || 0,
+        impressionsPaid: insights.post_impressions_paid || 0,
+        impressionsOrganic: insights.post_impressions_organic || 0,
+        engagedUsers: insights.post_engaged_users || 0,
+        clicks: insights.post_clicks || 0
+      },
+      message: 'Post metrics retrieved successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting post metrics: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Post image to Facebook
+export const postImageToFacebook = async (
+  userId: string,
+  pageId: string,
+  imageUrl: string,
+  caption?: string
+) => {
+  try {
+    const pageAccessToken = await getPageAccessToken(userId, pageId);
+    if (!pageAccessToken) {
+      return { success: false, message: 'Failed to get page access token' };
+    }
+
+    // Validate image URL
+    if (!imageUrl || !imageUrl.startsWith('http')) {
+      return { success: false, message: 'Invalid image URL - must start with http:// or https://' };
+    }
+
+    const params: any = {
+      url: imageUrl,
+      access_token: pageAccessToken
+    };
+    if (caption) params.caption = caption;
+
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/${pageId}/photos`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params)
+      }
+    );
+
+    const result: any = await response.json();
+    
+    if (result.error) {
+      return { success: false, message: result.error.message };
+    }
+
+    return {
+      success: true,
+      postId: result.post_id,
+      photoId: result.id,
+      message: 'Image posted successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error posting image: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Schedule post
+export const schedulePost = async (
+  userId: string,
+  pageId: string,
+  message: string,
+  scheduledTime: number | string, // Unix timestamp or ISO string
+  link?: string
+) => {
+  try {
+    const pageAccessToken = await getPageAccessToken(userId, pageId);
+    if (!pageAccessToken) {
+      return { success: false, message: 'Failed to get page access token' };
+    }
+
+    // Handle Malaysia timezone (UTC+8) scheduling
+    let timestamp: number;
+    
+    if (typeof scheduledTime === 'string') {
+      // Check if it's already a Unix timestamp string
+      if (/^\d{10}$/.test(scheduledTime)) {
+        timestamp = parseInt(scheduledTime);
+      } else {
+        // Parse ISO string and convert to Unix timestamp
+        const date = new Date(scheduledTime);
+        timestamp = Math.floor(date.getTime() / 1000);
+      }
+    } else if (typeof scheduledTime === 'number') {
+      timestamp = scheduledTime;
+    } else {
+      return {
+        success: false,
+        message: 'Invalid scheduledTime format. Use Unix timestamp (number) or ISO string'
+      };
+    }
+
+    // Validate timestamp is in the future (at least 10 minutes from now)
+    const now = Math.floor(Date.now() / 1000);
+    const minFutureTime = now + (10 * 60); // 10 minutes from now
+    const maxFutureTime = now + (6 * 30 * 24 * 60 * 60); // 6 months from now
+
+    if (timestamp < minFutureTime) {
+      return {
+        success: false,
+        message: `Scheduled time must be at least 10 minutes in the future. Minimum time: ${new Date(minFutureTime * 1000).toISOString()}`
+      };
+    }
+
+    if (timestamp > maxFutureTime) {
+      return {
+        success: false,
+        message: 'Scheduled time cannot be more than 6 months in the future'
+      };
+    }
+
+    const params: any = {
+      message,
+      published: false,
+      scheduled_publish_time: timestamp,
+      access_token: pageAccessToken
+    };
+    if (link) params.link = link;
+
+    console.log(`🇲🇾 Scheduling post for Malaysia timezone - Timestamp: ${timestamp}, Date: ${new Date(timestamp * 1000).toISOString()}`);
+
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/${pageId}/feed`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params)
+      }
+    );
+
+    const data: any = await response.json();
+    if (data.error) {
+      return { 
+        success: false, 
+        message: `Error scheduling post: ${data.error.message}`,
+        error: data.error
+      };
+    }
+
+    return {
+      success: true,
+      postId: data.id,
+      scheduledTime: new Date(timestamp * 1000).toISOString(),
+      scheduledTimestamp: timestamp,
+      message: 'Post scheduled successfully',
+      malaysiaTime: new Date(timestamp * 1000).toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' })
+    };
+
+  } catch (error: any) {
+    return {
+      success: false,
+      message: `Error scheduling post: ${error.message}`
+    };
+  }
+};
+
+// Update post
+export const updatePost = async (
+  userId: string,
+  postId: string,
+  message: string
+) => {
+  try {
+    const { userSessionManager } = await import('../config.js');
+    const session = userSessionManager.getSession(userId);
+    if (!session) {
+      throw new Error('User session not found');
+    }
+
+    // Extract page ID from post ID
+    const pageId = postId.split('_')[0];
+    const pageAccessToken = await getPageAccessToken(userId, pageId);
+    if (!pageAccessToken) {
+      return { success: false, message: 'Failed to get page access token' };
+    }
+
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/${postId}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message,
+          access_token: pageAccessToken
+        })
+      }
+    );
+
+    const result: any = await response.json();
+    
+    if (result.error) {
+      return { success: false, message: result.error.message };
+    }
+
+    return {
+      success: result.success || true,
+      message: 'Post updated successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error updating post: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Get page fan count
+export const getPageFanCount = async (userId: string, pageId: string) => {
+  try {
+    const pageAccessToken = await getPageAccessToken(userId, pageId);
+    if (!pageAccessToken) {
+      return { success: false, message: 'Failed to get page access token' };
+    }
+
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/${pageId}?fields=fan_count,name&access_token=${pageAccessToken}`
+    );
+
+    const result: any = await response.json();
+    
+    if (result.error) {
+      return { success: false, message: result.error.message };
+    }
+
+    return {
+      success: true,
+      pageId,
+      pageName: result.name,
+      fanCount: result.fan_count || 0,
+      message: `Page has ${result.fan_count || 0} fans`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting fan count: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Get top commenters
+export const getPostTopCommenters = async (
+  userId: string,
+  postId: string,
+  limit: number = 10
+) => {
+  try {
+    const commentsResult = await getPostComments(userId, postId, 100);
+    
+    if (!commentsResult.success) {
+      return commentsResult;
+    }
+
+    // Count comments by user
+    const commenterCounts: { [key: string]: { name: string; count: number; userId: string } } = {};
+    
+    commentsResult.comments.forEach((comment: any) => {
+      const userId = comment.from?.id;
+      const userName = comment.from?.name || 'Unknown User';
+      
+      if (userId) {
+        if (!commenterCounts[userId]) {
+          commenterCounts[userId] = { name: userName, count: 0, userId };
+        }
+        commenterCounts[userId].count++;
+      }
+    });
+
+    // Sort by count and get top commenters
+    const topCommenters = Object.values(commenterCounts)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit);
+
+    return {
+      success: true,
+      topCommenters,
+      totalComments: commentsResult.comments.length,
+      uniqueCommenters: Object.keys(commenterCounts).length,
+      message: `Found ${topCommenters.length} top commenters`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting top commenters: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Get scheduled posts for a page using page access token
+export const getScheduledPosts = async (
+  userId: string,
+  pageId: string
+) => {
+  try {
+    const pageAccessToken = await getPageAccessToken(userId, pageId);
+    if (!pageAccessToken) {
+      return { success: false, message: 'Failed to get page access token' };
+    }
+
+    console.log(`🔍 Getting scheduled posts for page: ${pageId} with page access token`);
+
+    // Try the primary endpoint for scheduled posts with page token
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/${pageId}/promotable_posts?is_published=false&access_token=${pageAccessToken}`
+    );
+    const data: any = await response.json();
+    
+    if (data.error) {
+      console.log('❌ Primary endpoint failed, trying alternative...');
+      
+      // Try alternative endpoint with page token  
+      const altResponse = await fetch(
+        `https://graph.facebook.com/v23.0/${pageId}/feed?fields=id,message,created_time,scheduled_publish_time&published=false&access_token=${pageAccessToken}`
+      );
+      const altData: any = await altResponse.json();
+      
+      if (altData.error) {
+        // Try another alternative - published_posts with scheduled filter
+        console.log('❌ Feed endpoint failed, trying published_posts...');
+        const thirdResponse = await fetch(
+          `https://graph.facebook.com/v23.0/${pageId}/published_posts?fields=id,message,created_time,scheduled_publish_time&is_published=false&access_token=${pageAccessToken}`
+        );
+        const thirdData: any = await thirdResponse.json();
+        
+        if (thirdData.error) {
+          return {
+            success: false,
+            error: thirdData.error.message,
+            details: {
+              primaryError: data.error,
+              alternativeError: altData.error,
+              thirdError: thirdData.error,
+              suggestion: 'This endpoint may require additional permissions or the page may not have any scheduled posts'
+            }
+          };
+        }
+
+        const scheduledPosts = (thirdData.data || []).filter((post: any) => 
+          post.scheduled_publish_time && 
+          new Date(post.scheduled_publish_time) > new Date()
+        );
+
+        return {
+          success: true,
+          scheduledPosts,
+          totalScheduled: scheduledPosts.length,
+          message: `Found ${scheduledPosts.length} scheduled posts (via published_posts endpoint)`,
+          endpoint: 'published_posts'
+        };
+      }
+
+      const scheduledPosts = (altData.data || []).filter((post: any) => 
+        post.scheduled_publish_time && 
+        new Date(post.scheduled_publish_time) > new Date()
+      );
+
+      return {
+        success: true,
+        scheduledPosts,
+        totalScheduled: scheduledPosts.length,
+        message: `Found ${scheduledPosts.length} scheduled posts (via feed endpoint)`,
+        endpoint: 'feed_alternative'
+      };
+    }
+
+    // Filter for actually scheduled posts from primary endpoint
+    const scheduledPosts = (data.data || []).filter((post: any) => 
+      post.scheduled_publish_time && 
+      new Date(post.scheduled_publish_time) > new Date()
+    );
+
+    return {
+      success: true,
+      scheduledPosts,
+      totalScheduled: scheduledPosts.length,
+      message: `Found ${scheduledPosts.length} scheduled posts`,
+      endpoint: 'promotable_posts'
+    };
+
+  } catch (error: any) {
+    console.log('❌ getScheduledPosts error:', error.message);
+    return {
+      success: false,
+      error: `Error retrieving scheduled posts: ${error.message}`,
+      suggestion: 'Check if the page access token has the required permissions'
+    };
+  }
+};
+
+// Send DM to user (requires messaging permissions)
+export const sendDmToUser = async (
+  userId: string,
+  pageId: string,
+  recipientId: string,
+  message: string
+) => {
+  try {
+    const { userSessionManager } = await import('../config.js');
+    const session = userSessionManager.getSession(userId);
+    if (!session) {
+      throw new Error('User session not found');
+    }
+
+    const pageAccessToken = await getPageAccessToken(userId, pageId);
+    if (!pageAccessToken) {
+      return { success: false, message: 'Failed to get page access token' };
+    }
+
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/me/messages`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient: { id: recipientId },
+          message: { text: message },
+          access_token: pageAccessToken
+        })
+      }
+    );
+
+    const result: any = await response.json();
+    
+    if (result.error) {
+      return { success: false, message: result.error.message };
+    }
+
+    return {
+      success: true,
+      messageId: result.message_id,
+      message: 'DM sent successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error sending DM: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Helper functions for specific metrics
+export const getNumberOfComments = async (userId: string, postId: string) => {
+  try {
+    const { userSessionManager } = await import('../config.js');
+    const session = userSessionManager.getSession(userId);
+    if (!session) {
+      throw new Error('User session not found');
+    }
+
+    // Get page token first (more likely to work)
+    const pageId = postId.split('_')[0];
+    const pagesResult = await getUserFacebookPages(session.credentials.facebookAccessToken);
+    let pageAccessToken = null;
+    
+    if (pagesResult.success && pagesResult.pages) {
+      const page = pagesResult.pages.find((p: any) => p.id === pageId);
+      if (page && page.access_token) {
+        pageAccessToken = page.access_token;
+      }
+    }
+
+    // Try with page token first, then user token
+    let response = await fetch(
+      `https://graph.facebook.com/v23.0/${postId}?fields=comments.summary(true)&access_token=${pageAccessToken || session.credentials.facebookAccessToken}`
+    );
+    let result: any = await response.json();
+    
+    // If failed with page token (or no page token), try user token
+    if (result.error && pageAccessToken) {
+      response = await fetch(
+        `https://graph.facebook.com/v23.0/${postId}?fields=comments.summary(true)&access_token=${session.credentials.facebookAccessToken}`
+      );
+      result = await response.json();
+    }
+    
+    if (result.error) {
+      return { success: false, message: result.error.message };
+    }
+    
+    return {
+      success: true,
+      postId,
+      commentCount: result.comments?.summary?.total_count || 0,
+      message: `Post has ${result.comments?.summary?.total_count || 0} comments`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting comment count: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+export const getNumberOfLikes = async (userId: string, postId: string) => {
+  try {
+    const metricsResult = await getPostMetrics(userId, postId);
+    if (!metricsResult.success) {
+      return metricsResult;
+    }
+
+    return {
+      success: true,
+      postId,
+      likeCount: metricsResult.metrics?.likes || 0,
+      message: `Post has ${metricsResult.metrics?.likes || 0} likes`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting like count: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+export const getPostImpressions = async (userId: string, postId: string) => {
+  try {
+    const metricsResult = await getPostMetrics(userId, postId);
+    if (!metricsResult.success) {
+      return metricsResult;
+    }
+
+    return {
+      success: true,
+      postId,
+      impressions: metricsResult.metrics?.impressions || 0,
+      message: `Post has ${metricsResult.metrics?.impressions || 0} total impressions`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting impressions: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+export const getPostImpressionsUnique = async (userId: string, postId: string) => {
+  try {
+    const metricsResult = await getPostMetrics(userId, postId);
+    if (!metricsResult.success) {
+      return metricsResult;
+    }
+
+    return {
+      success: true,
+      postId,
+      uniqueImpressions: metricsResult.metrics?.impressionsUnique || 0,
+      message: `Post has ${metricsResult.metrics?.impressionsUnique || 0} unique impressions`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting unique impressions: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+export const getPostImpressionsPaid = async (userId: string, postId: string) => {
+  try {
+    const metricsResult = await getPostMetrics(userId, postId);
+    if (!metricsResult.success) {
+      return metricsResult;
+    }
+
+    return {
+      success: true,
+      postId,
+      paidImpressions: metricsResult.metrics?.impressionsPaid || 0,
+      message: `Post has ${metricsResult.metrics?.impressionsPaid || 0} paid impressions`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting paid impressions: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+export const getPostImpressionsOrganic = async (userId: string, postId: string) => {
+  try {
+    const metricsResult = await getPostMetrics(userId, postId);
+    if (!metricsResult.success) {
+      return metricsResult;
+    }
+
+    return {
+      success: true,
+      postId,
+      organicImpressions: metricsResult.metrics?.impressionsOrganic || 0,
+      message: `Post has ${metricsResult.metrics?.impressionsOrganic || 0} organic impressions`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting organic impressions: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+export const getPostEngagedUsers = async (userId: string, postId: string) => {
+  try {
+    const metricsResult = await getPostMetrics(userId, postId);
+    if (!metricsResult.success) {
+      return metricsResult;
+    }
+
+    return {
+      success: true,
+      postId,
+      engagedUsers: metricsResult.metrics?.engagedUsers || 0,
+      message: `Post has ${metricsResult.metrics?.engagedUsers || 0} engaged users`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting engaged users: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+export const getPostClicks = async (userId: string, postId: string) => {
+  try {
+    const metricsResult = await getPostMetrics(userId, postId);
+    if (!metricsResult.success) {
+      return metricsResult;
+    }
+
+    return {
+      success: true,
+      postId,
+      clicks: metricsResult.metrics?.clicks || 0,
+      message: `Post has ${metricsResult.metrics?.clicks || 0} clicks`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting clicks: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+export const getPostReactionsLikeTotal = async (userId: string, postId: string) => {
+  try {
+    const { userSessionManager } = await import('../config.js');
+    const session = userSessionManager.getSession(userId);
+    if (!session) {
+      throw new Error('User session not found');
+    }
+
+    // Get page token if available
+    const pageId = postId.split('_')[0];
+    const pagesResult = await getUserFacebookPages(session.credentials.facebookAccessToken);
+    let pageAccessToken = null;
+    
+    if (pagesResult.success && pagesResult.pages) {
+      const page = pagesResult.pages.find((p: any) => p.id === pageId);
+      if (page && page.access_token) {
+        pageAccessToken = page.access_token;
+      }
+    }
+
+    // Try with best available token
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/${postId}?fields=reactions.type(LIKE).summary(total_count)&access_token=${pageAccessToken || session.credentials.facebookAccessToken}`
+    );
+
+    const result: any = await response.json();
+    
+    if (result.error) {
+      return { success: false, message: result.error.message };
+    }
+
+    const likeCount = result.reactions?.summary?.total_count || 0;
+
+    return {
+      success: true,
+      postId,
+      likeReactions: likeCount,
+      message: `Post has ${likeCount} LIKE reactions`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting like reactions: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+export const getPostShareCount = async (userId: string, postId: string) => {
+  try {
+    const { userSessionManager } = await import('../config.js');
+    const session = userSessionManager.getSession(userId);
+    if (!session) {
+      throw new Error('User session not found');
+    }
+
+    // Get page token if available
+    const pageId = postId.split('_')[0];
+    const pagesResult = await getUserFacebookPages(session.credentials.facebookAccessToken);
+    let pageAccessToken = null;
+    
+    if (pagesResult.success && pagesResult.pages) {
+      const page = pagesResult.pages.find((p: any) => p.id === pageId);
+      if (page && page.access_token) {
+        pageAccessToken = page.access_token;
+      }
+    }
+
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/${postId}?fields=shares&access_token=${pageAccessToken || session.credentials.facebookAccessToken}`
+    );
+
+    const result: any = await response.json();
+    
+    if (result.error) {
+      return { success: false, message: result.error.message };
+    }
+
+    const shareCount = result.shares?.count || 0;
+
+    return {
+      success: true,
+      postId,
+      shareCount: shareCount,
+      message: `Post has ${shareCount} shares`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting share count: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+
+// FIXED VERSION - Get number of comments using page access token
+export const getCommentsFixed = async (userId: string, postId: string) => {
+  try {
+    // Extract page ID from post ID (format: pageId_postId)
+    const pageId = postId.split('_')[0];
+    const pageAccessToken = await getPageAccessToken(userId, pageId);
+    if (!pageAccessToken) {
+      return { success: false, message: 'Failed to get page access token' };
+    }
+
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/${postId}?fields=comments.summary(true)&access_token=${pageAccessToken}`
+    );
+    const result = await response.json() as FacebookApiResponse;
+    
+    if (result.error) {
+      return { success: false, message: result.error.message };
+    }
+    
+    return {
+      success: true,
+      postId,
+      commentCount: result.comments?.summary?.total_count || 0,
+      message: `Post has ${result.comments?.summary?.total_count || 0} comments`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting comment count: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+
+// SMART TOKEN VERSIONS - Auto fallback between user and page tokens
+
+// 1. Smart get_post_comments
+export const getPostCommentsSmart = async (
+  userId: string,
+  postId: string,
+  limit: number = 25
+) => {
+  try {
+    const result = await smartApiCall(
+      userId, 
+      postId, 
+      `${postId}/comments?fields=id,message,from,created_time,like_count,comment_count&limit=${limit}`
+    );
+    
+    if (!result.success) {
+      return { success: false, message: result.message };
+    }
+    
+    return {
+      success: true,
+      comments: result.data?.data || [],
+      paging: result.data?.paging,
+      message: `Retrieved ${result.data?.data?.length || 0} comments`,
+      tool: 'get_post_comments_smart'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting post comments: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      tool: 'get_post_comments_smart'
+    };
+  }
+};
+
+// 2. Smart get_number_of_comments  
+export const getNumberOfCommentsSmart = async (userId: string, postId: string) => {
+  try {
+    const result = await smartApiCall(
+      userId,
+      postId,
+      `${postId}?fields=comments.summary(true)`
+    );
+    
+    if (!result.success) {
+      return { success: false, message: result.message };
+    }
+    
+    return {
+      success: true,
+      postId,
+      commentCount: result.data?.comments?.summary?.total_count || 0,
+      message: `Post has ${result.data?.comments?.summary?.total_count || 0} comments`,
+      tool: 'get_number_of_comments_smart'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting comment count: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      tool: 'get_number_of_comments_smart'
+    };
+  }
+};
+
+// 3. Smart get_number_of_likes
+export const getNumberOfLikesSmart = async (userId: string, postId: string) => {
+  try {
+    const result = await smartApiCall(
+      userId,
+      postId,
+      `${postId}?fields=reactions.summary(true)`
+    );
+    
+    if (!result.success) {
+      return { success: false, message: result.message };
+    }
+    
+    return {
+      success: true,
+      postId,
+      likeCount: result.data?.reactions?.summary?.total_count || 0,
+      message: `Post has ${result.data?.reactions?.summary?.total_count || 0} likes`,
+      tool: 'get_number_of_likes_smart'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting like count: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      tool: 'get_number_of_likes_smart'
+    };
+  }
+};
+
+// Smart API call for comment operations - tries all available page tokens
+async function smartCommentApiCall(
+  userId: string,
+  endpoint: string,
+  method: 'POST' | 'DELETE' = 'POST',
+  body?: any
+): Promise<SmartApiResult> {
+  try {
+    const { userSessionManager } = await import('../config.js');
+    const session = userSessionManager.getSession(userId);
+    
+    if (!session) {
+      return { success: false, message: 'User session not found' };
+    }
+
+    const userToken = session.credentials.facebookAccessToken;
+    
+    // Try to get all page tokens for this user
+    try {
+      const pagesResult = await getUserFacebookPages(userToken);
+      if (pagesResult.success && pagesResult.pages) {
+        // Try each page token
+        for (const page of pagesResult.pages) {
+          if (page.access_token) {
+            try {
+              const separator = endpoint.includes('?') ? '&' : '?';
+              const pageUrl = `https://graph.facebook.com/v23.0/${endpoint}${separator}access_token=${page.access_token}`;
+              const pageOptions: any = { method };
+              
+              if (body && method === 'POST') {
+                pageOptions.headers = { 'Content-Type': 'application/json' };
+                pageOptions.body = JSON.stringify(body);
+              }
+              
+              const pageResponse = await fetch(pageUrl, pageOptions);
+              const pageData = await pageResponse.json() as FacebookApiResponse;
+              
+              if (!pageData.error) {
+                return { success: true, data: pageData };
+              }
+            } catch (pageError) {
+              // Continue to next page token
+            }
+          }
+        }
+      }
+    } catch (pagesError) {
+      // Fall back to user token
+    }
+    
+    // Try user token as fallback
+    try {
+      const separator = endpoint.includes('?') ? '&' : '?';
+      const userUrl = `https://graph.facebook.com/v23.0/${endpoint}${separator}access_token=${userToken}`;
+      const userOptions: any = { method };
+      
+      if (body && method === 'POST') {
+        userOptions.headers = { 'Content-Type': 'application/json' };
+        userOptions.body = JSON.stringify(body);
+      }
+      
+      const userResponse = await fetch(userUrl, userOptions);
+      const userData = await userResponse.json() as FacebookApiResponse;
+      
+      if (!userData.error) {
+        return { success: true, data: userData };
+      }
+      
+      return { success: false, message: userData.error.message };
+    } catch (userError) {
+      return { success: false, message: 'All token attempts failed' };
+    }
+  } catch (error) {
+    return { 
+      success: false, 
+      message: `Error in smart comment API call: ${error instanceof Error ? error.message : 'Unknown error'}` 
+    };
+  }
+}  
+export const replyToCommentSmart = async (
+  userId: string,
+  commentId: string,
+  message: string
+) => {
+  try {
+    const result = await smartCommentApiCall(
+      userId,
+      `${commentId}/comments`,
+      'POST',
+      { message }
+    );
+    
+    if (!result.success) {
+      return { 
+        success: false, 
+        message: result.message, 
+        tool: 'reply_to_comment_smart' 
+      };
+    }
+    
+    return {
+      success: true,
+      commentId,
+      replyId: result.data?.id,
+      message: 'Reply posted successfully using smart token system',
+      tool: 'reply_to_comment_smart'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error replying to comment: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      tool: 'reply_to_comment_smart'
+    };
+  }
+};
+
+// 5. Smart delete_comment
+export const deleteCommentSmart = async (userId: string, commentId: string) => {
+  try {
+    const result = await smartCommentApiCall(
+      userId,
+      commentId,
+      'DELETE'
+    );
+    
+    if (!result.success) {
+      return { 
+        success: false, 
+        message: result.message, 
+        tool: 'delete_comment_smart' 
+      };
+    }
+    
+    return {
+      success: true,
+      commentId,
+      message: 'Comment deleted successfully using smart token system',
+      tool: 'delete_comment_smart'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error deleting comment: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      tool: 'delete_comment_smart'
+    };
+  }
+};
+
+// Alias for delete_comment
+export const deleteCommentFromPost = async (userId: string, commentId: string) => {
+  return await deleteComment(userId, commentId);
+};

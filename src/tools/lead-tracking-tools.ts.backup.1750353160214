@@ -1,0 +1,264 @@
+import { userSessionManager } from '../config.js';
+
+interface Lead {
+  ad_id: string | null;
+  total_lead: number;
+}
+
+interface LeadsResponse {
+  leads: Lead[];
+  total_sale: number;
+}
+
+interface LeadsDataResult {
+  success: boolean;
+  summary?: {
+    totalLeads: number;
+    totalSale: number;
+    dateRange: {
+      start: string;
+      end: string;
+    };
+    staffId: string;
+    leadsByAdId?: Record<string, number>;
+  };
+  rawData?: LeadsResponse;
+  message?: string;
+}
+
+interface AdInsights {
+  impressions?: number;
+  reach?: number;
+  spend?: number;
+  clicks?: number;
+  cpm?: number;
+  cpc?: number;
+  ctr?: number;
+  adName?: string;
+  adStatus?: string;
+  adSetName?: string;
+  campaignName?: string;
+}
+
+interface AdPerformance {
+  adId: string;
+  adName: string;
+  campaignName: string;
+  totalLeads: number;
+  totalSpend: number;
+  costPerLead: number;
+  impressions?: number;
+  clicks?: number;
+  ctr?: number;
+}
+
+// Get leads data from Laravel app
+export const getLeadsData = async (
+  userId: string, 
+  staffId: string, 
+  startDate: string, 
+  endDate: string
+): Promise<LeadsDataResult> => {
+  try {
+    const session = userSessionManager.getSession(userId);
+    if (!session) {
+      throw new Error('User session not found');
+    }
+
+    // Build the URL with parameters
+    const url = `https://rvsbbot.com/getinfo/${staffId}/${startDate}/${endDate}`;
+    
+    console.log(`Fetching leads data from: ${url}`);
+    
+    // Fetch data from Laravel app
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json() as LeadsResponse;
+    
+    if (!data || !data.leads) {
+      return {
+        success: false,
+        message: 'Invalid response format from server'
+      };
+    }
+
+    // Process the leads data
+    const leadsByAdId: Record<string, number> = {};
+    let totalLeads = 0;
+
+    data.leads.forEach(lead => {
+      const adId = lead.ad_id || 'no_ad_id';
+      leadsByAdId[adId] = lead.total_lead;
+      totalLeads += lead.total_lead;
+    });
+
+    return {
+      success: true,
+      summary: {
+        totalLeads: totalLeads,
+        totalSale: data.total_sale,
+        dateRange: {
+          start: startDate,
+          end: endDate
+        },
+        staffId: staffId,
+        leadsByAdId: leadsByAdId
+      },
+      rawData: data,
+      message: 'Leads data retrieved successfully'
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error fetching leads data: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Get leads with Facebook Ads insights combined
+export const getLeadsWithAdInsights = async (
+  userId: string,
+  staffId: string,
+  startDate: string,
+  endDate: string
+) => {
+  try {
+    const session = userSessionManager.getSession(userId);
+    if (!session) {
+      throw new Error('User session not found');
+    }
+
+    // First get leads data
+    const leadsResult = await getLeadsData(userId, staffId, startDate, endDate);
+    
+    if (!leadsResult.success || !leadsResult.summary) {
+      return leadsResult;
+    }
+
+    // Get unique ad IDs from leads (excluding null)
+    const uniqueAdIds = Object.keys(leadsResult.summary?.leadsByAdId || {})
+      .filter(adId => adId !== 'no_ad_id' && adId !== 'null');
+    
+    // Fetch Facebook Ads insights for each unique ad ID
+    const adInsights: Record<string, AdInsights> = {};
+    
+    for (const adId of uniqueAdIds) {
+      try {
+        // Get ad insights from Facebook
+        const insightsUrl = `https://graph.facebook.com/v23.0/${adId}/insights?fields=impressions,reach,spend,clicks,cpm,cpc,ctr&time_range={'since':'${startDate}','until':'${endDate}'}&access_token=${session.credentials.facebookAccessToken}`;
+        
+        const insightsResponse = await fetch(insightsUrl);
+        const insightsData = await insightsResponse.json() as any;
+        
+        if (insightsData.data && insightsData.data.length > 0) {
+          const insights = insightsData.data[0];
+          adInsights[adId] = {
+            impressions: parseInt(insights.impressions || 0),
+            reach: parseInt(insights.reach || 0),
+            spend: parseFloat(insights.spend || 0),
+            clicks: parseInt(insights.clicks || 0),
+            cpm: parseFloat(insights.cpm || 0),
+            cpc: parseFloat(insights.cpc || 0),
+            ctr: parseFloat(insights.ctr || 0)
+          };
+        }
+
+        // Also get ad details
+        const adDetailsUrl = `https://graph.facebook.com/v23.0/${adId}?fields=name,status,adset{name,campaign{name}}&access_token=${session.credentials.facebookAccessToken}`;
+        const adDetailsResponse = await fetch(adDetailsUrl);
+        const adDetails = await adDetailsResponse.json() as any;
+        
+        if (!adDetails.error) {
+          adInsights[adId] = {
+            ...adInsights[adId],
+            adName: adDetails.name,
+            adStatus: adDetails.status,
+            adSetName: adDetails.adset?.name,
+            campaignName: adDetails.adset?.campaign?.name
+          };
+        }
+      } catch (error) {
+        console.error(`Error fetching insights for ad ${adId}:`, error);
+      }
+    }
+
+    // Calculate cost per lead for each ad
+    const adPerformance: Record<string, AdPerformance> = {};
+    
+    uniqueAdIds.forEach(adId => {
+      const totalLeadsForAd = leadsResult.summary?.leadsByAdId?.[adId] || 0;
+      const insights = adInsights[adId];
+      
+      if (insights && insights.spend !== undefined) {
+        adPerformance[adId] = {
+          adId: adId,
+          adName: insights.adName || 'Unknown',
+          campaignName: insights.campaignName || 'Unknown',
+          totalLeads: totalLeadsForAd,
+          totalSpend: insights.spend,
+          costPerLead: totalLeadsForAd > 0 ? insights.spend / totalLeadsForAd : 0,
+          impressions: insights.impressions,
+          clicks: insights.clicks,
+          ctr: insights.ctr
+        };
+      }
+    });
+
+    // Calculate overall metrics
+    const totalSpend = Object.values(adInsights).reduce((sum, insights) => sum + (insights.spend || 0), 0);
+    const totalLeads = leadsResult.summary!.totalLeads;
+    const overallCostPerLead = totalLeads > 0 ? totalSpend / totalLeads : 0;
+
+    // Find best performing ads
+    const adPerformanceArray = Object.values(adPerformance);
+    const bestCPL = adPerformanceArray.length > 0 
+      ? adPerformanceArray.reduce((best, current) => 
+          current.costPerLead < best.costPerLead ? current : best
+        )
+      : null;
+    
+    const mostLeads = adPerformanceArray.length > 0
+      ? adPerformanceArray.reduce((best, current) => 
+          current.totalLeads > best.totalLeads ? current : best
+        )
+      : null;
+
+    return {
+      success: true,
+      summary: {
+        dateRange: {
+          start: startDate,
+          end: endDate
+        },
+        totalLeads: totalLeads,
+        totalSpend: totalSpend,
+        totalSale: leadsResult.summary.totalSale,
+        overallCostPerLead: overallCostPerLead,
+        uniqueAdsUsed: uniqueAdIds.length,
+        bestPerformingAd: bestCPL,
+        adWithMostLeads: mostLeads
+      },
+      adPerformance: adPerformance,
+      leadsByAdId: leadsResult.summary.leadsByAdId,
+      rawData: leadsResult.rawData,
+      message: 'Leads data with ad insights retrieved successfully'
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error fetching leads with insights: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};

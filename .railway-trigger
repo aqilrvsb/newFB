@@ -1,0 +1,2 @@
+const timestamp = Date.now();
+module.exports = { timestamp };

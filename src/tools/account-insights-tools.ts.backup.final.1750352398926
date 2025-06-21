@@ -1,0 +1,282 @@
+import { userSessionManager } from '../config.js';
+
+interface AccountInsight {
+  spend: string;
+  impressions: string;
+  clicks: string;
+  cpm?: string;
+  cpc?: string;
+  ctr?: string;
+  account_id: string;
+  account_name: string;
+}
+
+interface AccountSpendSummary {
+  accountId: string;
+  accountName: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  cpm: number;
+  cpc: number;
+  ctr: number;
+  currency: string;
+}
+
+// Get insights for a single ad account
+export const getAccountInsights = async (
+  userId: string,
+  accountId: string,
+  dateRange: string = 'today'
+) => {
+  try {
+    const session = userSessionManager.getSession(userId);
+    if (!session) {
+      throw new Error('User session not found');
+    }
+
+    // Build the insights URL
+    const insightsUrl = `https://graph.facebook.com/v23.0/${accountId}/insights?fields=spend,impressions,clicks,cpm,cpc,ctr,account_id,account_name&date_preset=${dateRange}&access_token=${session.credentials.facebookAccessToken}`;
+    
+    console.log(`Fetching insights for account: ${accountId}`);
+    
+    const response = await fetch(insightsUrl);
+    const data = await response.json() as any;
+    
+    if (data.error) {
+      throw new Error(data.error.message || 'Failed to get account insights');
+    }
+
+    // Process the insights data
+    if (data.data && data.data.length > 0) {
+      const insight = data.data[0];
+      return {
+        success: true,
+        accountId: accountId,
+        dateRange: dateRange,
+        insights: {
+          spend: parseFloat(insight.spend || '0'),
+          impressions: parseInt(insight.impressions || '0'),
+          clicks: parseInt(insight.clicks || '0'),
+          cpm: parseFloat(insight.cpm || '0'),
+          cpc: parseFloat(insight.cpc || '0'),
+          ctr: parseFloat(insight.ctr || '0'),
+          accountName: insight.account_name || 'Unknown'
+        },
+        message: 'Account insights retrieved successfully'
+      };
+    } else {
+      return {
+        success: true,
+        accountId: accountId,
+        dateRange: dateRange,
+        insights: {
+          spend: 0,
+          impressions: 0,
+          clicks: 0,
+          cpm: 0,
+          cpc: 0,
+          ctr: 0,
+          accountName: 'Unknown'
+        },
+        message: 'No insights data available for this period'
+      };
+    }
+
+  } catch (error) {
+    return {
+      success: false,
+      accountId: accountId,
+      message: `Error getting account insights: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Get total spend across all ad accounts
+export const getTotalSpendAllAccounts = async (
+  userId: string,
+  dateRange: string = 'today'
+) => {
+  try {
+    const session = userSessionManager.getSession(userId);
+    if (!session) {
+      throw new Error('User session not found');
+    }
+
+    // First get all ad accounts
+    const accountsUrl = `https://graph.facebook.com/v23.0/me/adaccounts?fields=id,name,currency,account_status&access_token=${session.credentials.facebookAccessToken}`;
+    const accountsResponse = await fetch(accountsUrl);
+    const accountsData = await accountsResponse.json() as any;
+    
+    if (!accountsData.data || accountsData.data.length === 0) {
+      return {
+        success: true,
+        totalSpend: 0,
+        currency: 'MYR',
+        accountCount: 0,
+        dateRange: dateRange,
+        accounts: [],
+        message: 'No ad accounts found'
+      };
+    }
+
+    // Get insights for each account
+    const accountInsights: AccountSpendSummary[] = [];
+    let totalSpend = 0;
+    let totalImpressions = 0;
+    let totalClicks = 0;
+    
+    for (const account of accountsData.data) {
+      try {
+        const insightsUrl = `https://graph.facebook.com/v23.0/${account.id}/insights?fields=spend,impressions,clicks,cpm,cpc,ctr&date_preset=${dateRange}&access_token=${session.credentials.facebookAccessToken}`;
+        const insightsResponse = await fetch(insightsUrl);
+        const insightsData = await insightsResponse.json() as any;
+        
+        if (insightsData.data && insightsData.data.length > 0) {
+          const insight = insightsData.data[0];
+          const spend = parseFloat(insight.spend || '0');
+          const impressions = parseInt(insight.impressions || '0');
+          const clicks = parseInt(insight.clicks || '0');
+          
+          if (spend > 0) {
+            accountInsights.push({
+              accountId: account.id,
+              accountName: account.name,
+              spend: spend,
+              impressions: impressions,
+              clicks: clicks,
+              cpm: parseFloat(insight.cpm || '0'),
+              cpc: parseFloat(insight.cpc || '0'),
+              ctr: parseFloat(insight.ctr || '0'),
+              currency: account.currency
+            });
+            
+            totalSpend += spend;
+            totalImpressions += impressions;
+            totalClicks += clicks;
+          }
+        }
+      } catch (error) {
+        console.error(`Error getting insights for account ${account.id}:`, error);
+      }
+    }
+
+    // Calculate overall metrics
+    const overallCPM = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
+    const overallCPC = totalClicks > 0 ? totalSpend / totalClicks : 0;
+    const overallCTR = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+
+    // Sort accounts by spend (highest first)
+    accountInsights.sort((a, b) => b.spend - a.spend);
+
+    return {
+      success: true,
+      dateRange: dateRange,
+      totalSpend: totalSpend,
+      totalImpressions: totalImpressions,
+      totalClicks: totalClicks,
+      overallCPM: overallCPM,
+      overallCPC: overallCPC,
+      overallCTR: overallCTR,
+      currency: 'MYR',
+      accountCount: accountsData.data.length,
+      accountsWithSpend: accountInsights.length,
+      accounts: accountInsights,
+      message: `Total spend across ${accountInsights.length} active accounts: ${totalSpend.toFixed(2)} MYR`
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting total spend: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+// Get spend by campaign across all accounts
+export const getSpendByCampaign = async (
+  userId: string,
+  dateRange: string = 'today'
+) => {
+  try {
+    const session = userSessionManager.getSession(userId);
+    if (!session) {
+      throw new Error('User session not found');
+    }
+
+    // First get all ad accounts
+    const accountsUrl = `https://graph.facebook.com/v23.0/me/adaccounts?fields=id,name&access_token=${session.credentials.facebookAccessToken}`;
+    const accountsResponse = await fetch(accountsUrl);
+    const accountsData = await accountsResponse.json() as any;
+    
+    if (!accountsData.data || accountsData.data.length === 0) {
+      return {
+        success: true,
+        campaigns: [],
+        totalSpend: 0,
+        message: 'No ad accounts found'
+      };
+    }
+
+    const allCampaigns: any[] = [];
+    let totalSpend = 0;
+
+    // Get campaigns and their insights for each account
+    for (const account of accountsData.data) {
+      try {
+        // Get campaigns with insights
+        const campaignsUrl = `https://graph.facebook.com/v23.0/${account.id}/campaigns?fields=id,name,status,objective,insights.date_preset(${dateRange}){spend,impressions,clicks,cpm,cpc,ctr}&access_token=${session.credentials.facebookAccessToken}`;
+        const campaignsResponse = await fetch(campaignsUrl);
+        const campaignsData = await campaignsResponse.json() as any;
+        
+        if (campaignsData.data) {
+          for (const campaign of campaignsData.data) {
+            if (campaign.insights && campaign.insights.data && campaign.insights.data.length > 0) {
+              const insight = campaign.insights.data[0];
+              const spend = parseFloat(insight.spend || '0');
+              
+              if (spend > 0) {
+                allCampaigns.push({
+                  campaignId: campaign.id,
+                  campaignName: campaign.name,
+                  accountId: account.id,
+                  accountName: account.name,
+                  status: campaign.status,
+                  objective: campaign.objective,
+                  spend: spend,
+                  impressions: parseInt(insight.impressions || '0'),
+                  clicks: parseInt(insight.clicks || '0'),
+                  cpm: parseFloat(insight.cpm || '0'),
+                  cpc: parseFloat(insight.cpc || '0'),
+                  ctr: parseFloat(insight.ctr || '0')
+                });
+                
+                totalSpend += spend;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error getting campaigns for account ${account.id}:`, error);
+      }
+    }
+
+    // Sort campaigns by spend (highest first)
+    allCampaigns.sort((a, b) => b.spend - a.spend);
+
+    return {
+      success: true,
+      dateRange: dateRange,
+      totalSpend: totalSpend,
+      campaignCount: allCampaigns.length,
+      campaigns: allCampaigns,
+      message: `Found ${allCampaigns.length} campaigns with spend totaling ${totalSpend.toFixed(2)} MYR`
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error getting campaign spend: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
