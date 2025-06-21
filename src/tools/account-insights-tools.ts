@@ -174,9 +174,30 @@ export const getTotalSpendAllAccounts = async (
         
         // Get insights using SDK
         const fields = ['spend', 'impressions', 'clicks', 'cpm', 'cpc', 'ctr'];
-        const params = {
-          date_preset: dateRange
-        };
+        let params: any = {};
+        
+        // Check if dateRange is a custom format
+        if (dateRange.includes(' to ')) {
+          // Custom date range format: "16-06-2025 to 18-06-2025"
+          const [start, end] = dateRange.split(' to ');
+          // Convert DD-MM-YYYY to YYYY-MM-DD
+          const startParts = start.trim().split('-');
+          const endParts = end.trim().split('-');
+          params.time_range = {
+            since: `${startParts[2]}-${startParts[1]}-${startParts[0]}`,
+            until: `${endParts[2]}-${endParts[1]}-${endParts[0]}`
+          };
+        } else if (dateRange.includes(',')) {
+          // Custom date range format: "2025-06-01,2025-06-21"
+          const [startDate, endDate] = dateRange.split(',');
+          params.time_range = {
+            since: startDate.trim(),
+            until: endDate.trim()
+          };
+        } else {
+          // Use Facebook's date preset
+          params.date_preset = dateRange;
+        }
         
         const insightsData = await adAccount.getInsights(fields, params);
         
