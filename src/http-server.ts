@@ -21,6 +21,7 @@ import * as adTools from './tools/ad-tools.js';
 import * as pageTools from './tools/page-tools.js';
 import * as adsLibraryTools from './tools/ads-library-tools.js';
 import * as leadTrackingTools from './tools/lead-tracking-tools.js';
+import * as reportingTools from './tools/reporting-tools.js';
 import * as cronJobTools from './tools/cron-job-tools.js';
 import * as accountInsightsTools from './tools/account-insights-tools.js';
 
@@ -1725,6 +1726,7 @@ wss.on('connection', async (ws: WebSocket, req) => {
                 { name: 'check_ad_id', description: 'Check ad details and hierarchy by ad ID', inputSchema: { type: 'object', properties: { adId: { type: 'string', description: 'Facebook ad ID to check' } }, required: ['adId'] } },
                 { name: 'get_leads_data', description: 'Get leads data from Laravel app', inputSchema: { type: 'object', properties: { staffId: { type: 'string', description: 'Staff ID (e.g., RV-007)' }, startDate: { type: 'string', description: 'Start date in DD-MM-YYYY format' }, endDate: { type: 'string', description: 'End date in DD-MM-YYYY format' } }, required: ['staffId', 'startDate', 'endDate'] } },
                 { name: 'get_leads_with_insights', description: 'Get leads data with Facebook ad insights and ROI metrics', inputSchema: { type: 'object', properties: { staffId: { type: 'string', description: 'Staff ID (e.g., RV-007)' }, startDate: { type: 'string', description: 'Start date in DD-MM-YYYY format' }, endDate: { type: 'string', description: 'End date in DD-MM-YYYY format' } }, required: ['staffId', 'startDate', 'endDate'] } },
+                { name: 'get_lead_report', description: 'Generate comprehensive lead report with full ad metrics including budget, spend, CPM, CTR, and ROAS', inputSchema: { type: 'object', properties: { staffId: { type: 'string', description: 'Staff ID (e.g., RV-007)' }, startDate: { type: 'string', description: 'Start date in DD-MM-YYYY format' }, endDate: { type: 'string', description: 'End date in DD-MM-YYYY format' } }, required: ['staffId', 'startDate', 'endDate'] } },
                 { name: 'get_audiences', description: 'Lists available custom audiences', inputSchema: { type: 'object', properties: { limit: { type: 'number', default: 25 } } } },
                 { name: 'create_custom_audience', description: 'Creates a custom audience', inputSchema: { type: 'object', properties: { name: { type: 'string' }, type: { type: 'string', enum: ['CUSTOM', 'WEBSITE', 'ENGAGEMENT'] }, description: { type: 'string' } }, required: ['name', 'type'] } },
                 { name: 'get_facebook_pages', description: 'Get Facebook pages with permissions', inputSchema: { type: 'object', properties: {} } },
@@ -4426,6 +4428,30 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           }
 
           const result = await leadTrackingTools.getLeadsWithAdInsights(userId, staffId, startDate, endDate);
+          return { ...result, tool: toolName };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            tool: toolName
+          };
+        }
+
+      case 'get_lead_report':
+        try {
+          const staffId = args.staffId;
+          const startDate = args.startDate;
+          const endDate = args.endDate;
+          
+          if (!staffId || !startDate || !endDate) {
+            return {
+              success: false,
+              error: 'Staff ID, start date, and end date are required',
+              tool: 'get_lead_report'
+            };
+          }
+
+          const result = await reportingTools.getLeadReport(userId, staffId, startDate, endDate);
           return { ...result, tool: toolName };
         } catch (error) {
           return {
