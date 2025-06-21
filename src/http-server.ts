@@ -4436,6 +4436,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             tool: toolName
           };
         }
+        break;
 
       case 'get_lead_report':
         try {
@@ -4460,6 +4461,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             tool: toolName
           };
         }
+        break;
 
       case 'create_cron_job':
         try {
