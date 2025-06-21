@@ -96,29 +96,6 @@ export const getMetaPlatformId = async (
             error: 'No ads found for this search term'
           });
         }
-
-        if (sortedPages.length > 0) {
-          results.push({
-            brandName,
-            success: true,
-            platformId: sortedPages[0].id,
-            pageName: sortedPages[0].name,
-            category: sortedPages[0].category,
-            fanCount: sortedPages[0].fan_count,
-            verified: sortedPages[0].verification_status || false,
-            alternatives: sortedPages.slice(1, 5).map((p: any) => ({
-              id: p.id,
-              name: p.name,
-              fanCount: p.fan_count
-            }))
-          });
-        } else {
-          results.push({
-            brandName,
-            success: false,
-            error: 'No pages found for this brand name'
-          });
-        }
       } catch (error) {
         results.push({
           brandName,
