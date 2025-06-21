@@ -1621,6 +1621,7 @@ app.post('/mcp/:userId', async (req, res) => {
     const { method, params } = req.body;
 
     const session = userSessionManager.getSession(userId);
+    console.log('[DIAGNOSTIC] Session retrieved for user:', userId, 'Has session:', !!session);
     if (!session) {
       return res.status(401).json({
         error: 'Invalid session',
@@ -1657,6 +1658,7 @@ wss.on('connection', async (ws: WebSocket, req) => {
     }
 
     const session = userSessionManager.getSession(userId);
+    console.log('[DIAGNOSTIC] Session retrieved for user:', userId, 'Has session:', !!session);
     if (!session) {
       ws.close(1008, 'Invalid or expired session');
       return;
@@ -1841,6 +1843,7 @@ async function processMcpRequest(method: string, params: any): Promise<any> {
 async function getUserFacebookPages(userId: string): Promise<any> {
   try {
     const session = userSessionManager.getSession(userId);
+    console.log('[DIAGNOSTIC] Session retrieved for user:', userId, 'Has session:', !!session);
     if (!session) {
       return { success: false, error: 'Invalid session' };
     }
@@ -1930,6 +1933,9 @@ async function getUserFacebookPages(userId: string): Promise<any> {
 
 // Helper function to ensure Facebook SDK is properly initialized
 function ensureFacebookSDKInitialized(session: any): boolean {
+    console.log('[DIAGNOSTIC] ensureFacebookSDKInitialized called');
+    console.log('[DIAGNOSTIC] Session param:', !!session);
+    console.log('[DIAGNOSTIC] Token exists:', !!session?.credentials?.facebookAccessToken);
   if (!session?.credentials?.facebookAccessToken) {
     return false;
   }
@@ -1946,6 +1952,7 @@ function ensureFacebookSDKInitialized(session: any): boolean {
 
 async function processMcpToolCall(toolName: string, args: any, userId: string): Promise<any> {
   const session = userSessionManager.getSession(userId);
+    console.log('[DIAGNOSTIC] Session retrieved for user:', userId, 'Has session:', !!session);
   if (!session) {
     throw new Error('Invalid session');
   }
@@ -1955,7 +1962,22 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
   const Campaign = require('facebook-nodejs-business-sdk').Campaign;
   const AdAccount = require('facebook-nodejs-business-sdk').AdAccount;
   
-  FacebookAdsApi.init(session.credentials.facebookAccessToken);
+  // Diagnostic: Log token status
+    console.log('[DIAGNOSTIC] Processing MCP tool:', toolName);
+    console.log('[DIAGNOSTIC] User ID:', userId);
+    console.log('[DIAGNOSTIC] Session exists:', !!session);
+    console.log('[DIAGNOSTIC] Has credentials:', !!session?.credentials);
+    console.log('[DIAGNOSTIC] Has Facebook token:', !!session?.credentials?.facebookAccessToken);
+    console.log('[DIAGNOSTIC] Token length:', session?.credentials?.facebookAccessToken?.length || 0);
+    console.log('[DIAGNOSTIC] Token preview:', session?.credentials?.facebookAccessToken?.substring(0, 20) + '...');
+    
+    try {
+      FacebookAdsApi.init(session.credentials.facebookAccessToken);
+      console.log('[DIAGNOSTIC] SDK initialized successfully');
+    } catch (sdkError) {
+      console.error('[DIAGNOSTIC] SDK initialization failed:', sdkError);
+      throw sdkError;
+    }
 
   try {
     switch (toolName) {
@@ -2217,6 +2239,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
 
           // Get the account ID from the session
           const session = userSessionManager.getSession(userId);
+    console.log('[DIAGNOSTIC] Session retrieved for user:', userId, 'Has session:', !!session);
           const adAccountId = session?.credentials?.selectedAccountId;
           
           // Create campaign using SDK
@@ -2775,6 +2798,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           }
 
           const session = userSessionManager.getSession(userId);
+    console.log('[DIAGNOSTIC] Session retrieved for user:', userId, 'Has session:', !!session);
           if (!session) {
             return {
               success: false,
@@ -3163,6 +3187,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
 
           // Try simpler approach with direct Graph API call
           const session = userSessionManager.getSession(userId);
+    console.log('[DIAGNOSTIC] Session retrieved for user:', userId, 'Has session:', !!session);
           if (!session) {
             return {
               success: false,
@@ -3259,6 +3284,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
 
           // Use our proven create_ad method with Graph API
           const session = userSessionManager.getSession(userId);
+    console.log('[DIAGNOSTIC] Session retrieved for user:', userId, 'Has session:', !!session);
           if (!session) {
             return {
               success: false,
@@ -3887,6 +3913,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
           // Get page details using Facebook API
           const { userSessionManager } = await import('./config.js');
           const session = userSessionManager.getSession(userId);
+    console.log('[DIAGNOSTIC] Session retrieved for user:', userId, 'Has session:', !!session);
           if (!session) throw new Error('User session not found');
           
           // Use SDK to get page details
@@ -3972,6 +3999,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
         try {
           const { userSessionManager } = await import('./config.js');
           const session = userSessionManager.getSession(userId);
+    console.log('[DIAGNOSTIC] Session retrieved for user:', userId, 'Has session:', !!session);
           if (!session) throw new Error('User session not found');
           
           // Get page access token
@@ -4026,6 +4054,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
         try {
           const { userSessionManager } = await import('./config.js');
           const session = userSessionManager.getSession(userId);
+    console.log('[DIAGNOSTIC] Session retrieved for user:', userId, 'Has session:', !!session);
           if (!session) throw new Error('User session not found');
           
           // Extract page ID from post ID
@@ -4071,6 +4100,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
         try {
           const { userSessionManager } = await import('./config.js');
           const session = userSessionManager.getSession(userId);
+    console.log('[DIAGNOSTIC] Session retrieved for user:', userId, 'Has session:', !!session);
           if (!session) throw new Error('User session not found');
           
           // Extract page ID from post ID
@@ -4116,6 +4146,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
         try {
           const { userSessionManager } = await import('./config.js');
           const session = userSessionManager.getSession(userId);
+    console.log('[DIAGNOSTIC] Session retrieved for user:', userId, 'Has session:', !!session);
           if (!session) throw new Error('User session not found');
           
           const limit = args.limit || 25;
@@ -4142,6 +4173,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
         try {
           const { userSessionManager } = await import('./config.js');
           const session = userSessionManager.getSession(userId);
+    console.log('[DIAGNOSTIC] Session retrieved for user:', userId, 'Has session:', !!session);
           if (!session) throw new Error('User session not found');
           
           // Get page access token
@@ -4182,6 +4214,7 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
         try {
           const { userSessionManager } = await import('./config.js');
           const session = userSessionManager.getSession(userId);
+    console.log('[DIAGNOSTIC] Session retrieved for user:', userId, 'Has session:', !!session);
           if (!session) throw new Error('User session not found');
           
           const timeFilter = args.timeFilter || 'upcoming';
@@ -4756,6 +4789,31 @@ async function processMcpToolCall(toolName: string, args: any, userId: string): 
             tool: toolName
           };
         }
+        break;
+
+      // Diagnostic endpoint to check session and token
+      case 'debug_session':
+        console.log('[DIAGNOSTIC] Debug session requested for user:', userId);
+        const debugInfo = {
+          userId: userId,
+          sessionExists: !!session,
+          hasCredentials: !!session?.credentials,
+          hasFacebookToken: !!session?.credentials?.facebookAccessToken,
+          tokenLength: session?.credentials?.facebookAccessToken?.length || 0,
+          tokenPreview: session?.credentials?.facebookAccessToken ? 
+            session.credentials.facebookAccessToken.substring(0, 30) + '...' : 'No token',
+          sessionKeys: session ? Object.keys(session) : [],
+          credentialKeys: session?.credentials ? Object.keys(session.credentials) : []
+        };
+        
+        console.log('[DIAGNOSTIC] Debug info:', JSON.stringify(debugInfo, null, 2));
+        
+        return {
+          success: true,
+          tool: 'debug_session',
+          debugInfo: debugInfo,
+          message: 'Session debug information retrieved'
+        };
 
       default:
         return {
