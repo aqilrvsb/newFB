@@ -39,17 +39,28 @@ export const getAccountInsights = async (
       throw new Error('User session not found');
     }
 
-    // Map dateRange to Facebook's valid date_preset values  
-    // Facebook API uses specific preset values - checked official docs
-    const datePresetMap = {
-      'today': 'today',
-      'yesterday': 'yesterday', 
-      'last_7_days': 'last_7_days',
-      'last_30_days': 'last_30_days'
-    };
+    // Check if dateRange contains a comma (custom date range)
+    let params: any = {};
     
-    const validDateRange = datePresetMap[dateRange as keyof typeof datePresetMap] || 'today';
-
+    if (dateRange.includes(',')) {
+      // Custom date range format: "2025-06-01,2025-06-21"
+      const [startDate, endDate] = dateRange.split(',');
+      params.time_range = {
+        since: startDate.trim(),
+        until: endDate.trim()
+      };
+    } else {
+      // Map dateRange to Facebook's valid date_preset values  
+      const datePresetMap = {
+        'today': 'today',
+        'yesterday': 'yesterday', 
+        'last_7_days': 'last_7_days',
+        'last_30_days': 'last_30_days'
+      };
+      
+      const validDateRange = datePresetMap[dateRange as keyof typeof datePresetMap] || 'today';
+      params.date_preset = validDateRange;
+    }
     // Initialize SDK with user's access token
     FacebookAdsApi.init(session.credentials.facebookAccessToken);
     
@@ -58,9 +69,6 @@ export const getAccountInsights = async (
     
     // Get insights using SDK
     const fields = ['spend', 'impressions', 'clicks', 'cpm', 'cpc', 'ctr'];
-    const params = {
-      date_preset: validDateRange
-    };
     
     const insights = await adAccount.getInsights(fields, params);
     
@@ -68,7 +76,7 @@ export const getAccountInsights = async (
       return {
         success: true,
         accountId: accountId,
-        dateRange: validDateRange,
+        dateRange: dateRange,
         insights: {
           spend: 0,
           impressions: 0,
@@ -86,7 +94,7 @@ export const getAccountInsights = async (
     return {
       success: true,
       accountId: accountId,
-      dateRange: validDateRange,
+      dateRange: dateRange,
       insights: {
         spend: parseFloat(insight.spend || '0'),
         impressions: parseInt(insight.impressions || '0'),

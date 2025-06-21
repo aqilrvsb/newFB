@@ -23,29 +23,79 @@ export const getMetaPlatformId = async (
 
     for (const brandName of brands) {
       try {
-        // Search for pages matching the brand name
-        const response = await FacebookAdsApi.getDefaultApi().call('GET', ['pages/search'], {"q":"${encodeURIComponent(brandName)}","fields":"id,name,category,verification_status,fan_count"});
-
-        const data: any = await response.json();
+        // Initialize SDK
+        FacebookAdsApi.init(session.credentials.facebookAccessToken);
         
-        if (data.error) {
+        // Use SDK to search ads archive
+        const params = {
+          search_terms: brandName,
+          ad_reached_countries: ['MY'], // Default to Malaysia
+          ad_type: 'ALL',
+          limit: 10
+        };
+
+        // Use the SDK's call method for ads_archive endpoint
+        const response = await FacebookAdsApi.getDefaultApi().call(
+          'GET',
+          '/ads_archive',
+          params
+        );
+        
+        if (response.error) {
           results.push({
             brandName,
             success: false,
-            error: data.error.message
+            error: response.error.message
           });
           continue;
         }
 
-        // Find the most relevant page (highest fan count or verified)
-        const pages = data.data || [];
-        const sortedPages = pages.sort((a: any, b: any) => {
-          // Prioritize verified pages
-          if (a.verification_status && !b.verification_status) return -1;
-          if (!a.verification_status && b.verification_status) return 1;
-          // Then sort by fan count
-          return (b.fan_count || 0) - (a.fan_count || 0);
-        });
+        // Get unique page IDs from the ads
+        const pageIds = new Set<string>();
+        const pageInfo: any = {};
+        
+        if (response.data && response.data.length > 0) {
+          response.data.forEach((ad: any) => {
+            if (ad.page_id && ad.page_name) {
+              pageIds.add(ad.page_id);
+              if (!pageInfo[ad.page_id]) {
+                pageInfo[ad.page_id] = {
+                  id: ad.page_id,
+                  name: ad.page_name,
+                  adCount: 0
+                };
+              }
+              pageInfo[ad.page_id].adCount++;
+            }
+          });
+          
+          // Sort by ad count
+          const sortedPages = Object.values(pageInfo).sort((a: any, b: any) => b.adCount - a.adCount);
+          
+          if (sortedPages.length > 0) {
+            const topPage = sortedPages[0] as any;
+            results.push({
+              brandName,
+              success: true,
+              platformId: topPage.id,
+              pageName: topPage.name,
+              adsFound: topPage.adCount,
+              alternatives: sortedPages.slice(1, 5)
+            });
+          } else {
+            results.push({
+              brandName,
+              success: false,
+              error: 'No page information found in ads'
+            });
+          }
+        } else {
+          results.push({
+            brandName,
+            success: false,
+            error: 'No ads found for this search term'
+          });
+        }
 
         if (sortedPages.length > 0) {
           results.push({
@@ -112,9 +162,11 @@ export const getMetaAds = async (
       throw new Error('User session not found');
     }
 
+    // Initialize SDK
+    FacebookAdsApi.init(session.credentials.facebookAccessToken);
+
     // Build query parameters
     const params: any = {
-      access_token: session.credentials.facebookAccessToken,
       ad_archive_id: platformId,
       ad_type: adType || 'ALL',
       ad_active_status: adActiveStatus || 'ALL',
@@ -125,31 +177,24 @@ export const getMetaAds = async (
     // Add optional filters
     if (searchTerms) params.search_terms = searchTerms;
     if (adReachedCountries && adReachedCountries.length > 0) {
-      params.ad_reached_countries = adReachedCountries.join(',');
+      params.ad_reached_countries = adReachedCountries;
     }
     if (adDeliveryDateMin) params.ad_delivery_date_min = adDeliveryDateMin;
     if (adDeliveryDateMax) params.ad_delivery_date_max = adDeliveryDateMax;
 
-    // Construct URL with query parameters
-    const queryString = Object.entries(params)
-      .map(([key, value]) => `${key}=${encodeURIComponent(String(value))}`)
-      .join('&');
-
-    const api = FacebookAdsApi.getDefaultApi();
-    const apiResult = await api.call('GET', ['ads_archive'], params);
-    const response = { 
-      ok: true, 
-      json: async () => apiResult 
-    };
-
-    const result: any = await response.json();
+    // Use SDK to call ads_archive endpoint
+    const response = await FacebookAdsApi.getDefaultApi().call(
+      'GET',
+      '/ads_archive',
+      params
+    );
     
-    if (result.error) {
-      return { success: false, message: result.error.message };
+    if (response.error) {
+      return { success: false, message: response.error.message };
     }
 
     // Process and format ads data
-    const ads = (result.data || []).map((ad: any) => ({
+    const ads = (response.data || []).map((ad: any) => ({
       id: ad.id,
       pageId: ad.page_id,
       pageName: ad.page_name,
@@ -187,7 +232,7 @@ export const getMetaAds = async (
       totalAds: ads.length,
       activeAds: ads.filter((ad: any) => ad.isActive).length,
       inactiveAds: ads.filter((ad: any) => !ad.isActive).length,
-      paging: result.paging,
+      paging: response.paging,
       message: `Retrieved ${ads.length} ads from the ads library`
     };
   } catch (error) {
@@ -213,8 +258,10 @@ export const searchAdsLibrary = async (
       throw new Error('User session not found');
     }
 
+    // Initialize SDK
+    FacebookAdsApi.init(session.credentials.facebookAccessToken);
+
     const params: any = {
-      access_token: session.credentials.facebookAccessToken,
       search_terms: searchQuery,
       ad_type: adType || 'ALL',
       limit: Math.min(limit, 100),
@@ -222,30 +269,24 @@ export const searchAdsLibrary = async (
     };
 
     if (countries && countries.length > 0) {
-      params.ad_reached_countries = countries.join(',');
+      params.ad_reached_countries = countries;
     }
 
-    const queryString = Object.entries(params)
-      .map(([key, value]) => `${key}=${encodeURIComponent(String(value))}`)
-      .join('&');
-
-    const api = FacebookAdsApi.getDefaultApi();
-    const result2 = await api.call('GET', ['ads_archive'], params);
-    const response = { 
-      ok: true, 
-      json: async () => result2 
-    };
-
-    const result: any = await response.json();
+    // Use SDK to call ads_archive endpoint
+    const response = await FacebookAdsApi.getDefaultApi().call(
+      'GET',
+      '/ads_archive',
+      params
+    );
     
-    if (result.error) {
-      return { success: false, message: result.error.message };
+    if (response.error) {
+      return { success: false, message: response.error.message };
     }
 
     // Group ads by advertiser
     const advertiserMap: { [key: string]: any[] } = {};
     
-    (result.data || []).forEach((ad: any) => {
+    (response.data || []).forEach((ad: any) => {
       if (!advertiserMap[ad.page_id]) {
         advertiserMap[ad.page_id] = [];
       }
@@ -272,11 +313,11 @@ export const searchAdsLibrary = async (
     return {
       success: true,
       searchQuery,
-      totalAds: result.data?.length || 0,
+      totalAds: response.data?.length || 0,
       uniqueAdvertisers: advertisers.length,
       advertisers,
       countries: countries || [],
-      message: `Found ${result.data?.length || 0} ads from ${advertisers.length} advertisers`
+      message: `Found ${response.data?.length || 0} ads from ${advertisers.length} advertisers`
     };
   } catch (error) {
     return {

@@ -21,6 +21,14 @@ export const createAd = async (
   try {
     const adAccount = getAdAccount(userId);
     
+    // Debug log
+    console.log('Creating ad with params:', {
+      name,
+      adSetId,
+      creativeId,
+      status
+    });
+    
     const params: any = {
       name,
       adset_id: adSetId,
@@ -46,6 +54,7 @@ export const createAd = async (
       message: 'Ad created successfully (Note: Update creative with real page ID and content)'
     };
   } catch (error) {
+    console.error('Ad creation error:', error);
     return {
       success: false,
       message: `Error creating ad: ${error instanceof Error ? error.message : 'Unknown error'}`

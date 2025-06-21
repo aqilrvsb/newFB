@@ -1,4 +1,4 @@
-import { getAdAccountForUser } from '../config.js';
+import { getAdAccountForUser, userSessionManager } from '../config.js';
 
 const { FacebookAdsApi, Page, User } = require('facebook-nodejs-business-sdk');
 
@@ -454,7 +454,44 @@ export async function getNumberOfComments(userId: string, postId: string) {
 }
 
 export async function getNumberOfLikes(userId: string, postId: string) {
-  return { success: false, message: 'Not implemented' };
+  try {
+    const session = userSessionManager.getSession(userId);
+    if (!session) {
+      throw new Error('User session not found');
+    }
+
+    // Initialize SDK
+    FacebookAdsApi.init(session.credentials.facebookAccessToken);
+    
+    // Try to get page access token if post is from a page
+    const pageId = postId.split('_')[0];
+    const pageAccessToken = await getPageAccessToken(userId, pageId);
+    
+    // Use the best available token
+    const accessToken = pageAccessToken || session.credentials.facebookAccessToken;
+    
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/${postId}?fields=reactions.summary(total_count)&access_token=${accessToken}`
+    );
+    
+    const result = await response.json() as any;
+    
+    if (result.error) {
+      throw new Error(result.error.message);
+    }
+    
+    return {
+      success: true,
+      postId: postId,
+      likesCount: result.reactions?.summary?.total_count || 0,
+      message: 'Like count retrieved successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
 }
 
 export async function getPostImpressions(userId: string, postId: string) {
