@@ -560,24 +560,44 @@ app.post('/stream/:userId?', async (req, res) => {
         },
 {
   name: 'get_lead_report',
-  description: 'LEAD ANALYTICS: Generates comprehensive lead tracking report with Facebook ad attribution and ROI analysis. INTELLIGENCE: Combines Laravel lead data with Facebook SDK insights for complete performance analysis. AUTOMATION: Perfect for daily/weekly reporting workflows and client presentations. USE CASE: Track lead generation effectiveness, calculate ROAS, analyze cost per lead across campaigns. WORKFLOW: Specify staffId + date range → Get detailed report with leads, conversions, spend, and ROI metrics. DATA INCLUDED: Lead counts, customer conversions, revenue, ad spend, cost per lead, ROAS, campaign performance breakdown.',
+  description: 'AD PERFORMANCE ANALYTICS: Generates comprehensive Facebook ad performance report for multiple users and ads. INTELLIGENCE: Fetches real-time Facebook SDK insights including spend, impressions, clicks, CPM, CTR metrics. AUTOMATION: Perfect for multi-user analytics and campaign performance tracking. USE CASE: Analyze ad performance across multiple users, calculate efficiency metrics, track campaign effectiveness. WORKFLOW: Provide adDataArray with user_id, date, and ads → Get detailed performance report with all Facebook metrics. DATA INCLUDED: Ad spend, impressions, clicks, CPM, CTR, reach, frequency, link clicks, campaign names, ad set details.',
   inputSchema: {
     type: 'object',
     properties: {
-      staffId: { 
-        type: 'string', 
-        description: 'Staff identifier for lead tracking (e.g., RV-007, MK-001). Used to filter leads by responsible marketer.' 
-      },
-      startDate: { 
-        type: 'string', 
-        description: 'Report start date in DD-MM-YYYY format (e.g., 15-06-2025). Defines beginning of analysis period.' 
-      },
-      endDate: { 
-        type: 'string', 
-        description: 'Report end date in DD-MM-YYYY format (e.g., 22-06-2025). Defines end of analysis period.' 
+      adDataArray: {
+        type: 'array',
+        description: 'Array of user ad data containing user_id, date, and ads with ad_id',
+        items: {
+          type: 'object',
+          properties: {
+            user_id: { 
+              type: 'string', 
+              description: 'User identifier for ad ownership tracking' 
+            },
+            date: { 
+              type: 'string', 
+              description: 'Analysis date in DD-MM-YYYY format (e.g., 26-06-2025)' 
+            },
+            ads: {
+              type: 'array',
+              description: 'Array of Facebook ads for this user',
+              items: {
+                type: 'object',
+                properties: {
+                  ad_id: { 
+                    type: 'string', 
+                    description: 'Facebook Ad ID (e.g., 120219408501250312)' 
+                  }
+                },
+                required: ['ad_id']
+              }
+            }
+          },
+          required: ['user_id', 'date', 'ads']
+        }
       }
     },
-    required: ['staffId', 'startDate', 'endDate']
+    required: ['adDataArray']
   }
 },
         { 
