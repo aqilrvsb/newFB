@@ -1,0 +1,12 @@
+{
+  "trigger": "railway_deployment",
+  "timestamp": "${new Date().toISOString()}",
+  "version": "2.1.0", 
+  "feature": "modified_get_lead_report",
+  "force_deploy": true,
+  "changes": {
+    "removed": ["Laravel CRM dependency"],
+    "added": ["adDataArray parameter", "multi-user support", "enhanced metrics"],
+    "modified": ["get_lead_report function", "tool parameters", "response structure"]
+  }
+}
