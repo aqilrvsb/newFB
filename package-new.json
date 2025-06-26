@@ -1,0 +1,5 @@
+{
+  "name": "dynamic-facebook-ads-mcp-server",
+  "version": "2.0.2",
+  "description": "Dynamic Multi-User MCP server for Facebook Ads with HTTP transport support - All objectives supported",
+  "main": "dist/index.js",

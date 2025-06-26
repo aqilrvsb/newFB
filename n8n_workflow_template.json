@@ -1,0 +1,130 @@
+{
+  "name": "Facebook MCP Connection",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://newfb-production.up.railway.app/auth",
+        "options": {
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "facebookAppId": "{{ $json.appId }}",
+            "facebookAppSecret": "{{ $json.appSecret }}",
+            "facebookAccessToken": "{{ $json.accessToken }}"
+          }
+        }
+      },
+      "id": "authenticate",
+      "name": "Authenticate with Facebook MCP",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "connectionType": "httpStreamable",
+        "httpStreamUrl": "https://newfb-production.up.railway.app/mcp/{{ $node['Authenticate with Facebook MCP'].json.userId }}",
+        "httpConnectionTimeout": 60000,
+        "messagesPostEndpoint": "https://newfb-production.up.railway.app/mcp/{{ $node['Authenticate with Facebook MCP'].json.userId }}",
+        "additionalHeaders": {
+          "Content-Type": "application/json",
+          "User-Agent": "N8N-MCP-Client"
+        }
+      },
+      "id": "mcpClient",
+      "name": "Facebook MCP Client",
+      "type": "n8n-nodes-base.mcpClient",
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "tools/call",
+        "params": {
+          "name": "get_ad_accounts",
+          "arguments": {}
+        }
+      },
+      "id": "getAccounts",
+      "name": "Get Facebook Accounts",
+      "type": "n8n-nodes-base.mcpClient",
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "tools/call",
+        "params": {
+          "name": "select_ad_account",
+          "arguments": {
+            "accountId": "{{ $node['Get Facebook Accounts'].json.accounts[0].id }}"
+          }
+        }
+      },
+      "id": "selectAccount",
+      "name": "Select First Account",
+      "type": "n8n-nodes-base.mcpClient",
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "tools/call",
+        "params": {
+          "name": "get_campaigns",
+          "arguments": {
+            "limit": "10"
+          }
+        }
+      },
+      "id": "getCampaigns",
+      "name": "Get Campaigns",
+      "type": "n8n-nodes-base.mcpClient",
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Authenticate with Facebook MCP": {
+      "main": [
+        [
+          {
+            "node": "Facebook MCP Client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Facebook MCP Client": {
+      "main": [
+        [
+          {
+            "node": "Get Facebook Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Facebook Accounts": {
+      "main": [
+        [
+          {
+            "node": "Select First Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select First Account": {
+      "main": [
+        [
+          {
+            "node": "Get Campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

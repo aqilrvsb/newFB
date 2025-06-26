@@ -1,0 +1,11 @@
+{
+  "trigger": "FORCE_RAILWAY_DEPLOY",
+  "timestamp": "${new Date().toISOString()}",
+  "commit": "Fix SALES optimization goal to OFFSITE_CONVERSIONS",
+  "changes": [
+    "Updated campaign-helpers.ts for OUTCOME_SALES",
+    "All 6 campaign objectives now working",
+    "Sessions never expire (SESSION_TIMEOUT=0)"
+  ],
+  "deploy": true
+}

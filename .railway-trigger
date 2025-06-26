@@ -1,0 +1,3 @@
+// Railway deployment trigger - Updated: ${new Date().toISOString()}
+const timestamp = Date.now();
+module.exports = { timestamp };

@@ -1,0 +1,122 @@
+// Import at the top of http-server.ts
+import { getOptimizationGoalForObjective, VALID_CAMPAIGN_OBJECTIVES } from './utils/campaign-helpers.js';
+
+// Updated create_campaign tool definition (line ~393)
+{ name: 'create_campaign', description: 'Creates a new ad campaign', inputSchema: { 
+  type: 'object', 
+  properties: { 
+    name: { type: 'string', description: 'Campaign name' }, 
+    objective: { 
+      type: 'string', 
+      description: 'Campaign objective',
+      enum: ['OUTCOME_AWARENESS', 'OUTCOME_TRAFFIC', 'OUTCOME_ENGAGEMENT', 'OUTCOME_LEADS', 'OUTCOME_APP_PROMOTION', 'OUTCOME_SALES'] 
+    }, 
+    status: { type: 'string', enum: ['ACTIVE', 'PAUSED'] } 
+  }, 
+  required: ['name', 'objective'] 
+} },
+
+// Updated create_campaign implementation (line ~1081)
+case 'create_campaign':
+  try {
+    // Validate objective
+    if (!VALID_CAMPAIGN_OBJECTIVES.includes(args.objective)) {
+      return {
+        success: false,
+        error: `Invalid objective. Valid options are: ${VALID_CAMPAIGN_OBJECTIVES.join(', ')}`,
+        tool: 'create_campaign'
+      };
+    }
+
+    // Use the selected ad account instead of getting all accounts
+    const adAccount = getAdAccountForUser(userId);
+    if (!adAccount) {
+      return {
+        success: false,
+        error: 'No ad account selected. Use select_ad_account first.',
+        tool: 'create_campaign'
+      };
+    }
+
+    const adAccountId = adAccount.id;
+
+    // Create campaign
+    const campaignData = {
+      name: args.name,
+      objective: args.objective,
+      status: args.status || 'PAUSED',
+      special_ad_categories: []
+    };
+
+    const createResponse = await fetch(`https://graph.facebook.com/v23.0/${adAccountId}/campaigns`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(campaignData)
+    });
+
+    const createResult: any = await createResponse.json();
+
+    if (createResult.error) {
+      return {
+        success: false,
+        error: `Facebook API Error: ${createResult.error.message}`,
+        tool: 'create_campaign'
+      };
+    }
+
+    return {
+      success: true,
+      tool: 'create_campaign',
+      result: {
+        id: createResult.id,
+        name: args.name,
+        objective: args.objective,
+        status: args.status || 'PAUSED',
+        created_time: new Date().toISOString()
+      },
+      message: 'Campaign created successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: `API Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      tool: 'create_campaign'
+    };
+  }
+
+// Updated create_ad_set optimization goal logic (replace lines ~1440-1454)
+// Get campaign details to determine proper optimization goal
+const campaignResponse = await fetch(`https://graph.facebook.com/v23.0/${campaignId}?fields=objective&access_token=${session.credentials.facebookAccessToken}`);
+const campaignData: any = await campaignResponse.json();
+
+if (campaignData.error) {
+  return {
+    success: false,
+    error: `Cannot get campaign objective: ${campaignData.error.message}`,
+    tool: 'create_ad_set'
+  };
+}
+
+// Use helper function to get optimization goal and billing event
+const { optimizationGoal, billingEvent } = getOptimizationGoalForObjective(campaignData.objective);
+
+// Also update the duplicate campaign handler in tools (line ~694)
+{
+  name: 'create_campaign',
+  description: 'Create a new Facebook ad campaign',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Campaign name' },
+      objective: { 
+        type: 'string', 
+        description: 'Campaign objective',
+        enum: ['OUTCOME_AWARENESS', 'OUTCOME_TRAFFIC', 'OUTCOME_ENGAGEMENT', 'OUTCOME_LEADS', 'OUTCOME_APP_PROMOTION', 'OUTCOME_SALES']
+      },
+      status: { type: 'string', description: 'Campaign status', enum: ['ACTIVE', 'PAUSED'] }
+    },
+    required: ['name', 'objective']
+  }
+},
